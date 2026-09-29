@@ -82,7 +82,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 
 .log h3 { font-family: var(--font-display); font-size: 1.1rem; margin: 0 0 8px; }
 .log ol { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-.log li a { display: grid; grid-template-columns: 7.5rem 1fr auto; gap: 12px; align-items: baseline; padding: 12px 4px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.log li a { display: grid; grid-template-columns: 9.5rem 1fr auto; gap: 12px; align-items: baseline; padding: 12px 4px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); }
 .log li a:hover .log-sum { color: var(--accent); }
 .log li a[aria-current="true"] { background: var(--accent-soft); }
 .log-date { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -126,6 +126,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   const summary = (b) => (b.headline || (b.items[0] && b.items[0].text) || "").replace(/\s+/g, " ");
 
   let index = [];
+  const idOf = (e) => e.id || e.date;
+  const seqOf = (e) => { const m = /-(\d+)$/.exec((e.id || "").slice(10)); return m ? Number(m[1]) : 1; };
+  const labelOf = (e) => fmtDate(e.date) + (index.filter(x => x.date === e.date).length > 1 ? " · #" + seqOf(e) : "");
 
   async function getJSON(path) {
     const r = await fetch(path, { cache: "no-store" });
@@ -196,8 +199,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 
     const head = el("div", "brief-head");
     const wildCount = b.items.filter(i => i.wildcard === true || isWild(i.text)).length;
-    head.append(el("span", "eyebrow", index[0] && index[0].date === b.date ? "Latest brief" : "Brief"));
-    head.append(el("h2", null, fmtDate(b.date)));
+    const entry = index.find(e => idOf(e) === idOf(b)) || b;
+    head.append(el("span", "eyebrow", index[0] && idOf(index[0]) === idOf(b) ? "Latest brief" : "Brief"));
+    head.append(el("h2", null, labelOf(entry)));
     const stats = el("div", "stats");
     stats.append(el("span", null, b.items.length + " items" + (wildCount ? " · " + wildCount + " wildcards" : "")));
     stats.append(el("span", null, words(b) + " words"));
@@ -234,7 +238,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     frag.append(head, renderPlayer(b), tr);
     if (b.footer) frag.append(el("p", "footer-note", b.footer));
     main.append(frag);
-    document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", a.dataset.date === b.date ? "true" : "false"));
+    document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", a.dataset.id === idOf(b) ? "true" : "false"));
   }
 
   function renderLog() {
@@ -243,19 +247,19 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     index.forEach((e) => {
       const li = el("li");
       const a = el("a");
-      a.href = "#d" + e.date; a.dataset.date = e.date;
-      a.append(el("span", "log-date", fmtDate(e.date)), el("span", "log-sum", e.summary || ""), el("span", "log-n", (e.items || 0) + " items"));
-      a.addEventListener("click", (ev) => { ev.preventDefault(); show(e.date, true); });
+      a.href = "#d" + idOf(e); a.dataset.id = idOf(e);
+      a.append(el("span", "log-date", labelOf(e)), el("span", "log-sum", e.summary || ""), el("span", "log-n", (e.items || 0) + " items"));
+      a.addEventListener("click", (ev) => { ev.preventDefault(); show(idOf(e), true); });
       li.append(a); list.append(li);
     });
     $("#log").hidden = index.length === 0;
   }
 
-  async function show(date, scroll) {
+  async function show(id, scroll) {
     try {
-      const b = await getJSON("briefs/" + date + ".json");
+      const b = await getJSON("briefs/" + id + ".json");
       renderBrief(b);
-      try { history.replaceState(null, "", "#d" + date); } catch (e) {}
+      try { history.replaceState(null, "", "#d" + id); } catch (e) {}
       if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       $("#brief").replaceChildren(el("div", "empty", "This brief could not be loaded. Pick another one below."));
@@ -265,15 +269,15 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   async function start() {
     try {
       index = await getJSON("briefs/index.json");
-      index.sort((a, b) => b.date.localeCompare(a.date));
+      index.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
     } catch (e) {
       $("#loading").textContent = "No briefs yet. The next scheduled run will add the first one here, with its audio, the full transcript and the direct links.";
       return;
     }
     renderLog();
     const want = (location.hash || "").replace(/^#d/, "");
-    const pick = index.find(e => e.date === want) || index[0];
-    if (pick) show(pick.date, false);
+    const pick = index.find(e => idOf(e) === want) || index[0];
+    if (pick) show(idOf(pick), false);
   }
   start();
 })();

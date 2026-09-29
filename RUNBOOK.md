@@ -15,7 +15,8 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
   the file locally and tells you where. Keep that path for step 8.
 - The newest entry whose `test` is not true: its `published_at` is the last successful
   run. If there is none, use the last 24 hours.
-- Read the newest ~4 briefs (`path` = `briefs/<date>.json`) and collect every URL in their
+- Read the newest ~4 briefs (`path` = `briefs/<id>.json`, where `<id>` is the entry's `id`,
+  or its `date` for entries without one) and collect every URL in their
   items. These are already-sent links; never send one again.
 
 ## 2. Fetch newsletters
@@ -66,6 +67,9 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   strings are fine for the main article. `source` is the newsletter name(s); set
   `"wildcard": true` on wildcard items (the page tags them).
 - `date`: today, YYYY-MM-DD. On a manual test run also set `"test": true`.
+- `id`: run `python3 build_digest.py nextid "<local briefs/index.json from step 1>" <date>`
+  and use what it prints (the date, or date-2, date-3... if today already has a brief).
+  Existing briefs are never replaced. Use `<id>` in every file name below.
 - `outro`: one short sign-off line.
 - `footer`: window covered, issues read, "Buzz = newsletter overlap (+ HN points when
   reachable)".
@@ -74,9 +78,9 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 
 ## 7. Audio
 - `python3 build_digest.py script digest.json` (writes script.txt), then
-  `python3 tts.py script.txt AI-Audio-Digest-YYYY-MM-DD.mp3` (Edge TTS; handles the cloud
+  `python3 tts.py script.txt AI-Audio-Digest-<id>.mp3` (Edge TTS; handles the cloud
   proxy's CA bundle).
-- Save it to Dropbox: `python3 dropbox_upload.py AI-Audio-Digest-YYYY-MM-DD.mp3`. It uploads
+- Save it to Dropbox: `python3 dropbox_upload.py AI-Audio-Digest-<id>.mp3`. It uploads
   to `/claude/ai_digest/` and prints a Dropbox shared link. It needs DROPBOX_APP_KEY,
   DROPBOX_APP_SECRET and DROPBOX_REFRESH_TOKEN, set on the cloud environment. The Dropbox
   connector cannot upload binary files, so this uses the Dropbox HTTP API.
@@ -88,12 +92,12 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 ## 8. Publish to the digest page (this replaces email)
 Adam does not want email: the Gmail connector wraps every link in a Google redirect page.
 - `python3 build_digest.py site digest.json out "<Dropbox link>" "<local path of the
-  briefs/index.json you read in step 1>"` writes `out/briefs/<date>.json` and a merged
+  briefs/index.json you read in step 1>"` writes `out/briefs/<id>.json` and a merged
   `out/briefs/index.json`.
 - Republish the page with the `Artifact` tool, action `publish`:
   `url` = https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy, `file_path` = `site/index.html` from this repo, and `files` =
-  `{"briefs/index.json": "out/briefs/index.json", "briefs/<date>.json": "out/briefs/<date>.json",
-  "audio/AI-Audio-Digest-<date>.mp3": "<the MP3 path>"}`. Do not pass `icon`,
+  `{"briefs/index.json": "out/briefs/index.json", "briefs/<id>.json": "out/briefs/<id>.json",
+  "audio/AI-Audio-Digest-<id>.mp3": "<the MP3 path>"}`. Do not pass `icon`,
   `capabilities` or `force`. Files you leave out (older briefs and audio) are kept.
 - If TTS failed, set `"audio_note": "Audio unavailable this run: <reason>"` in digest.json
   and leave the MP3 out of `files`.
