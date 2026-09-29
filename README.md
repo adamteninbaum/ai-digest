@@ -5,6 +5,8 @@ Adam's AI Newsletter Audio Digest, run as a Claude Code cloud Routine every 3 da
 - `RUNBOOK.md`: the prompt the Routine runs (fetch via Gmail connector, select, rank,
   script, Edge TTS, email delivery). State lives in Gmail's Sent folder, not in files.
 - `tts.py`: Edge TTS renderer that works behind the cloud session proxy.
+- `build_digest.py`: turns digest.json into the TTS script and the email (link to the
+  Dropbox audio plus the word-for-word transcript with each item's full URLs).
 - `resolve_links.py`: follows tracking redirects and strips tracking params.
 - `dropbox_upload.py`: uploads the MP3 to Dropbox `/claude/ai_digest/` and prints a shared link.
 - `preferences.md`: optional feedback the selection step reads each run.
