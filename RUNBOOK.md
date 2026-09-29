@@ -34,8 +34,19 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
 - Wildcards: 2 or 3 genuinely novel, surprising, or clever items regardless of topic.
   Bias AGAINST the big story every newsletter ran; bias TOWARD the odd item only one
   newsletter noticed.
-- If `preferences.md` exists in the adamteninbaum/ai-digest repo, read it and let it
-  sharpen picks.
+- Adam's votes: every item on the page has "More like this" / "Less like this" buttons.
+  Read them before choosing: load the `ArtifactData` tool (ToolSearch
+  `select:ArtifactData` if it is deferred), then action `list`, `url` = the digest page,
+  `collection` = `feedback`. Each document has `vote` ("up" or "down"), the item's
+  `text`, `source`, `urls`, `wildcard` and `date`. Page through all of them.
+- Learn from them: find the patterns in what he liked (topics, kinds of item such as
+  tools vs news vs how-tos, sources, wildcard style) and in what he disliked, and weight
+  today's picks toward the liked patterns and away from the disliked ones. Newer votes
+  count more than older ones. Keep 2 or 3 wildcards regardless, but shape them by the
+  wildcard votes. Never repeat an item he already voted on.
+- If the feedback read fails, carry on without it and say so in the footer. Mention in
+  the footer how many votes informed the picks (e.g. "Shaped by 12 votes: 9 up, 3 down").
+- `preferences.md` in the repo holds any standing preferences; read it too.
 
 ## 4. Buzz ranking (orders the list, never filters it)
 - Cross-newsletter overlap: count how many distinct newsletters covered each story.

@@ -77,6 +77,15 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .links a { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.45; overflow-wrap: anywhere; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .link-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
 .link-label { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.vote { display: flex; align-items: center; gap: 6px; }
+.vote button { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.vote button svg { width: 14px; height: 14px; fill: currentColor; }
+.vote button:hover { color: var(--ink); border-color: var(--muted); }
+.vote button.up[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.vote button.down[aria-pressed="true"] { background: var(--wild); border-color: var(--wild); color: var(--surface); }
+.vote button:disabled { opacity: 0.6; cursor: progress; }
+.vote .vote-err { font-family: var(--font-mono); font-size: 0.72rem; color: var(--wild); }
+.vote-hint { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); margin: 0; }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
 .footer-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
 
@@ -126,6 +135,60 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   const summary = (b) => (b.headline || (b.items[0] && b.items[0].text) || "").replace(/\s+/g, " ");
 
   let index = [];
+  let db = null;
+  let votes = new Map();
+  const UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21h4V9H2v12zm20-11a2 2 0 0 0-2-2h-6.3l1-4.6v-.3c0-.4-.2-.8-.4-1.1L13.2 1 6.6 7.6C6.2 8 6 8.5 6 9v10c0 1.1.9 2 2 2h9c.8 0 1.5-.5 1.8-1.2l3-7.1c.1-.2.2-.5.2-.7v-2z"/></svg>';
+  const DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 3h-4v12h4V3zM2 14a2 2 0 0 0 2 2h6.3l-1 4.6v.3c0 .4.2.8.4 1.1l1.1 1 6.6-6.6c.4-.4.6-.9.6-1.4V5c0-1.1-.9-2-2-2H7c-.8 0-1.5.5-1.8 1.2l-3 7.1c-.1.2-.2.5-.2.7v2z"/></svg>';
+
+  function refreshVotes() {
+    document.querySelectorAll(".vote").forEach((bar) => {
+      const v = votes.get(bar.dataset.key);
+      bar.querySelector(".up").setAttribute("aria-pressed", v && v.vote === "up" ? "true" : "false");
+      bar.querySelector(".down").setAttribute("aria-pressed", v && v.vote === "down" ? "true" : "false");
+      bar.hidden = !db;
+    });
+    document.querySelectorAll(".vote-hint").forEach((h) => { h.hidden = !db; });
+  }
+
+  async function castVote(bar, brief, n, item, which) {
+    const key = bar.dataset.key;
+    const current = votes.get(key);
+    const ref = db.collection("feedback").doc(key);
+    const btns = bar.querySelectorAll("button");
+    const err = bar.querySelector(".vote-err");
+    btns.forEach(b => b.disabled = true);
+    err.textContent = "";
+    try {
+      if (current && current.vote === which) {
+        await ref.delete();
+        votes.delete(key);
+      } else {
+        const body = {
+          briefId: idOf(brief), date: brief.date, item: n + 1, vote: which,
+          text: item.text, source: item.source || "", wildcard: item.wildcard === true || isWild(item.text),
+          urls: (item.urls || []).map(u => typeof u === "string" ? u : u.url),
+          at: new Date().toISOString()
+        };
+        await ref.set(body);
+        votes.set(key, body);
+      }
+    } catch (e) {
+      err.textContent = "Couldn't save your vote. Try again.";
+    } finally {
+      btns.forEach(b => b.disabled = false);
+      refreshVotes();
+    }
+  }
+
+  (async () => {
+    try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+    if (!db) return;
+    refreshVotes();
+    db.collection("feedback").onSnapshot((snap) => {
+      votes = new Map(snap.docs.map(d => [d.id, d.data()]));
+      refreshVotes();
+    }, () => {});
+  })();
   const idOf = (e) => e.id || e.date;
   const seqOf = (e) => { const m = /-(\d+)$/.exec((e.id || "").slice(10)); return m ? Number(m[1]) : 1; };
   const labelOf = (e) => fmtDate(e.date) + (index.filter(x => x.date === e.date).length > 1 ? " · #" + seqOf(e) : "");
@@ -210,6 +273,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 
     const tr = el("section", "transcript");
     tr.append(el("h3", null, "Transcript"));
+    const hint = el("p", "vote-hint", "Vote on items and future briefs will lean toward what you like.");
+    hint.hidden = !db; tr.append(hint);
     if (b.intro) tr.append(el("p", "say", b.intro));
     b.items.forEach((item, n) => {
       const wild = item.wildcard === true || isWild(item.text);
@@ -230,6 +295,17 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       });
       if (links.childElementCount) body.append(links);
       if (item.source) body.append(el("span", "src", item.source));
+      const bar = el("div", "vote");
+      bar.dataset.key = idOf(b).replace(/[^A-Za-z0-9_.~:@+-]/g, "_") + "_" + (n + 1);
+      const up = el("button", "up"); up.type = "button"; up.id = "up-" + bar.dataset.key;
+      up.innerHTML = UP + "<span>More like this</span>"; up.setAttribute("aria-pressed", "false");
+      const down = el("button", "down"); down.type = "button"; down.id = "down-" + bar.dataset.key;
+      down.innerHTML = DOWN + "<span>Less like this</span>"; down.setAttribute("aria-pressed", "false");
+      up.addEventListener("click", () => castVote(bar, b, n, item, "up"));
+      down.addEventListener("click", () => castVote(bar, b, n, item, "down"));
+      bar.append(up, down, el("span", "vote-err"));
+      bar.hidden = !db;
+      body.append(bar);
       seg.append(body);
       tr.append(seg);
     });
@@ -238,6 +314,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     frag.append(head, renderPlayer(b), tr);
     if (b.footer) frag.append(el("p", "footer-note", b.footer));
     main.append(frag);
+    refreshVotes();
     document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", a.dataset.id === idOf(b) ? "true" : "false"));
   }
 
