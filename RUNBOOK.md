@@ -43,22 +43,35 @@ Recipient: adamshawn0102@gmail.com. Subject format: `AI Audio Digest - YYYY-MM-D
   Not a list read aloud: each item gets a sentence or two on what it is and why it
   might matter to Adam. No URLs in the script.
 - Render with Edge TTS:
-  `pip install -q edge-tts && python3 tts.py script.txt AI-Audio-Digest-YYYY-MM-DD.mp3`
+  `pip install -q -r requirements.txt && python3 tts.py script.txt AI-Audio-Digest-YYYY-MM-DD.mp3`
   (`tts.py` is in the repo; it handles the cloud proxy's CA bundle).
-- Host the MP3: commit it to `audio/` on the `audio` branch of adamteninbaum/ai-digest
-  (create the branch if missing; clone the repo with add_repo if it is not present) and
-  push. Link: `https://github.com/adamteninbaum/ai-digest/blob/audio/audio/<file>.mp3`
-  (the Gmail connector can only attach files by inlining base64, which is not practical
-  for an MP3, so the email links to the audio instead).
-- If TTS or the push fails, still send the email and say "Audio unavailable this run:
+- Save the MP3 to Dropbox and get a link:
+  `python3 dropbox_upload.py AI-Audio-Digest-YYYY-MM-DD.mp3` (uploads to
+  `/claude/ai_digest/`, prints a Dropbox shared link). It needs DROPBOX_APP_KEY,
+  DROPBOX_APP_SECRET and DROPBOX_REFRESH_TOKEN, set on the cloud environment. The Dropbox
+  connector cannot upload binary files, so this uses the Dropbox HTTP API.
+- Fallback only if the Dropbox upload fails: commit the MP3 to `audio/` on the `audio`
+  branch of adamteninbaum/ai-digest, push, and link
+  `https://github.com/adamteninbaum/ai-digest/blob/audio/audio/<file>.mp3`.
+- If TTS fails entirely, still send the email and say "Audio unavailable this run:
   <reason>" at the top.
+
+## 5b. Clean the links
+- Collect the original link for every chosen item, then run
+  `python3 resolve_links.py URL1 URL2 ...`. It follows redirects (TLDR, Substack, AI
+  Tinkerers and other tracking links), unwraps archive.superhuman.ai mirror pages to the
+  original post, strips tracking params (utm_*, ref, _bhlid, jwt_token, fbclid, etc.), and
+  falls back to the original URL (tracking params stripped) when a link cannot be resolved.
+- Use the resolved URLs in the email, and compare resolved URLs when checking against
+  already-sent links.
 
 ## 6. Deliver
 Send one email with `send_message` (htmlBody plus a plain `body` fallback):
-- Top line: "Listen (~2 min)" linking to the MP3.
+- Top line: "Listen (~2 min)" linking to the Dropbox shared link for the MP3.
 - Then one bullet per item: a single line, the headline as a clickable link to the
-  original article (strip utm_ tracking params), then a short "why it matters" clause and
-  the source newsletter in parentheses. Wildcards get a "Wildcard:" prefix.
+  original article, then a short "why it matters" clause and
+  the source newsletter in parentheses. Wildcards get a "Wildcard:" prefix. Links are the
+  clean URLs from step 5b.
 - Footer: window covered, number of newsletters read, and "Buzz = newsletter overlap
   (+ HN points when reachable)".
 
