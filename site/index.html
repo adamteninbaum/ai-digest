@@ -93,6 +93,11 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .follow { font-family: var(--font-mono); font-size: 0.75rem; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
 .follow[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .w { transition: none; } }
+.gen { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.gen button { font-family: var(--font-mono); font-size: 0.75rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); cursor: pointer; }
+.gen button:disabled { opacity: 0.6; cursor: progress; }
+.gen .gen-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-align: right; max-width: 22rem; }
+.gen .gen-msg.err { color: var(--wild); }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
 .footer-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
 
@@ -115,7 +120,11 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 <div class="wrap">
   <header class="masthead">
     <h1>AI Audio Digest</h1>
-    <span class="sched">New brief daily · 11am ET</span>
+    <div class="gen" id="gen" hidden>
+      <button type="button" id="gen-btn">New brief now</button>
+      <span class="gen-msg" id="gen-msg">New brief daily · 11am ET</span>
+    </div>
+    <span class="sched" id="sched">New brief daily · 11am ET</span>
   </header>
 
   <main id="brief" aria-live="polite">
@@ -385,6 +394,72 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     refreshVotes();
     document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", a.dataset.id === idOf(b) ? "true" : "false"));
   }
+
+  // On-demand brief: starts Adam's "AI Audio Digest" Routine through the Claude Code Remote connector.
+  const TRIGGER_ID = "trig_013NgyhofBXEaRHN8K4cBjZc";
+  const COOLDOWN_MS = 15 * 60 * 1000;
+  let mcp = null, genWatch = 0;
+  const genMsg = (text, err) => { const m = $("#gen-msg"); m.textContent = text; m.classList.toggle("err", !!err); };
+  const etTime = (d) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" }) + " ET";
+
+  function watchForNewBrief(knownCount) {
+    clearInterval(genWatch);
+    const started = Date.now();
+    genWatch = setInterval(async () => {
+      if (Date.now() - started > 20 * 60 * 1000) { clearInterval(genWatch); genMsg("Still working or it stalled. Reload in a few minutes."); return; }
+      try {
+        const fresh = await getJSON("briefs/index.json");
+        if (fresh.length > knownCount) {
+          clearInterval(genWatch);
+          index = fresh.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
+          renderLog(); show(idOf(index[0]), true);
+          genMsg("New brief is ready.");
+          $("#gen-btn").disabled = false;
+        }
+      } catch (e) {}
+    }, 30000);
+  }
+
+  async function requestBrief() {
+    const btn = $("#gen-btn");
+    btn.disabled = true;
+    genMsg("Starting a new brief…");
+    let recent = null;
+    try { if (db) { const d = await db.doc("control/on_demand").get(); recent = d.exists ? d.data() : null; } } catch (e) {}
+    if (recent && recent.at && Date.now() - Date.parse(recent.at) < COOLDOWN_MS && !btn.dataset.confirm) {
+      btn.dataset.confirm = "1"; btn.disabled = false; btn.textContent = "Start another anyway";
+      genMsg("One was started at " + etTime(new Date(recent.at)) + " and may still be running.");
+      return;
+    }
+    const now = new Date();
+    try {
+      await mcp.callTool("Claude Code Remote", "fire_trigger", {
+        trigger_id: TRIGGER_ID,
+        text: "Adam tapped 'New brief now' on the digest page at " + etTime(now) + ". This is a real on-demand brief: follow RUNBOOK.md exactly, use the normal window since the last brief, and skip links already sent. If little is new, publish a short brief with what is new, including online discovery."
+      });
+      try { if (db) await db.doc("control/on_demand").set({ at: now.toISOString() }); } catch (e) {}
+      btn.textContent = "New brief now"; delete btn.dataset.confirm;
+      genMsg("Started at " + etTime(now) + ". It appears here in about 5 minutes.");
+      watchForNewBrief(index.length);
+    } catch (e) {
+      btn.disabled = false; btn.textContent = "New brief now"; delete btn.dataset.confirm;
+      const code = e && e.code;
+      if (code === "server_not_connected" || code === "selection_required") genMsg("Claude Code Remote isn't connected for you. Add it in claude.ai Settings, Connectors.", true);
+      else if (code === "needs_reauth") genMsg("Reconnect Claude Code Remote in claude.ai Settings, Connectors.", true);
+      else if (code === "not_in_manifest" || code === "not_granted" || code === "consent_required") genMsg("The page needs your permission to start runs. Tap again and choose Allow.", true);
+      else if (code === "tool_error") genMsg("The run didn't start: " + (e.message || "unknown error"), true);
+      else if (code === "server_unavailable" || code === "upstream_error") genMsg("Couldn't confirm it started. Wait a few minutes and reload before trying again.", true);
+      else genMsg("Couldn't start a brief (" + (code || "error") + "). Try again later.", true);
+    }
+  }
+
+  (async () => {
+    try { mcp = window.claude && window.claude.use ? await window.claude.use("mcp") : null; } catch (e) { mcp = null; }
+    if (!mcp) return;
+    $("#gen").hidden = false;
+    $("#sched").hidden = true;
+    $("#gen-btn").addEventListener("click", requestBrief);
+  })();
 
   function renderLog() {
     const list = $("#log-list");
