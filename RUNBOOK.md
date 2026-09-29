@@ -14,7 +14,7 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
 - `Artifact` action `read` with `url` = the page and `path` = `briefs/index.json`; it saves
   the file locally and tells you where. Keep that path for step 8.
 - The newest entry whose `test` is not true: its `published_at` is the last successful
-  run. If there is none, use the last 4 days.
+  run. If there is none, use the last 24 hours.
 - Read the newest ~4 briefs (`path` = `briefs/<date>.json`) and collect every URL in their
   items. These are already-sent links; never send one again.
 
@@ -23,10 +23,10 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
   then drop anything older than the exact last-run timestamp.
 - Dedupe by subject line (The Rundown arrives twice, to adamshawn0102@ and
   solomon.m.teninbaum@). Read EVERY unique issue in full with PLAIN_TEXT (typically
-  15 to 25 per window); do not sample or skim a subset. Wildcards come from the long tail.
+  6 to 12 per daily window); do not sample or skim a subset. Wildcards come from the long tail.
 - Ignore sponsor/ad blocks, job boards, referral and unsubscribe links.
 
-## 3. Select 6 to 8 items
+## 3. Select 4 to 7 items (daily brief)
 - Known lanes: 3D animation and motion design tooling; generative video and image models;
   VFX; creative production workflow; AI agents and automation; solo/small-business AI
   leverage; practical life hacks or clever workflow tricks of any kind.
@@ -69,7 +69,8 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 - `outro`: one short sign-off line.
 - `footer`: window covered, issues read, "Buzz = newsletter overlap (+ HN points when
   reachable)".
-- Total spoken length 230 to 300 words (90 seconds to 2 minutes).
+- Total spoken length about 150 to 300 words (1 to 2 minutes). On a slow day use fewer
+  items and a shorter script; never pad with weak picks.
 
 ## 7. Audio
 - `python3 build_digest.py script digest.json` (writes script.txt), then
