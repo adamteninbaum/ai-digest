@@ -1,0 +1,566 @@
+<title>Daily Digest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a broadcast rundown sheet. One column: the newest brief with its player on top, then the transcript as numbered segments, then past briefs as a log. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #16201d;
+  --muted: #5a6864;
+  --line: #d6ddda;
+  --accent: #0e6b62;
+  --accent-soft: #dcefeb;
+  --wild: #8a4b0f;
+  --wild-soft: #f6e9da;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Literata", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1514; --surface: #161e1c; --ink: #e2e9e6; --muted: #92a19c; --line: #26312e;
+    --accent: #5cc6b8; --accent-soft: #173330; --wild: #e0a569; --wild-soft: #33261a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1514; --surface: #161e1c; --ink: #e2e9e6; --muted: #92a19c; --line: #26312e;
+  --accent: #5cc6b8; --accent-soft: #173330; --wild: #e0a569; --wild-soft: #33261a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 17px; line-height: 1.6;
+  padding-inline: 16px; padding-block: 28px 64px;
+}
+.wrap { max-width: 44rem; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.masthead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; border-bottom: 2px solid var(--ink); padding-bottom: 10px; }
+.masthead h1 { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: 0.02em; margin: 0; }
+.masthead .sched { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+
+.brief-head { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.brief-head h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.9rem, 6vw, 2.6rem); line-height: 1.08; margin: 0; text-wrap: balance; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.player { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.player-row { display: flex; align-items: center; gap: 14px; }
+.play { flex: none; width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; display: grid; place-items: center; }
+.play svg { width: 20px; height: 20px; fill: currentColor; }
+.track { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.bar { position: relative; height: 8px; border-radius: 4px; background: var(--accent-soft); cursor: pointer; }
+.bar span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 4px; background: var(--accent); }
+.times { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.player-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.speeds { display: flex; gap: 6px; }
+.speeds button { font-family: var(--font-mono); font-size: 0.75rem; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; font-variant-numeric: tabular-nums; }
+.speeds button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.dropbox { font-family: var(--font-mono); font-size: 0.75rem; }
+.audio-missing { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); }
+
+.transcript { display: flex; flex-direction: column; gap: 0; }
+.transcript h3 { font-family: var(--font-mono); font-weight: 500; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+.say { margin: 0; padding-block: 10px; max-width: 65ch; }
+.seg { display: grid; grid-template-columns: 2.2rem 1fr; gap: 0 10px; padding-block: 16px; border-top: 1px solid var(--line); }
+.seg-no { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); padding-top: 4px; font-variant-numeric: tabular-nums; }
+.seg-body { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.seg-body p { margin: 0; max-width: 65ch; }
+.seg.wild .seg-no { color: var(--wild); }
+.tag { align-self: flex-start; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--wild); background: var(--wild-soft); padding: 2px 8px; border-radius: 4px; }
+.links { display: flex; flex-direction: column; gap: 4px; }
+.links a { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.45; overflow-wrap: anywhere; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.link-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.link-label { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.vote { display: flex; align-items: center; gap: 6px; }
+.vote button { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.vote button svg { width: 14px; height: 14px; fill: currentColor; }
+.vote button:hover { color: var(--ink); border-color: var(--muted); }
+.vote button.up[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.vote button.down[aria-pressed="true"] { background: var(--wild); border-color: var(--wild); color: var(--surface); }
+.vote button:disabled { opacity: 0.6; cursor: progress; }
+.vote .vote-err { font-family: var(--font-mono); font-size: 0.72rem; color: var(--wild); }
+.vote-hint { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); margin: 0; }
+.w { border-radius: 3px; cursor: pointer; transition: background-color 0.12s, box-shadow 0.12s; }
+.w:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+.w.on { background: var(--accent); box-shadow: 0 0 0 2px var(--accent); color: var(--bg); }
+.seg.live .seg-no { color: var(--accent); }
+.follow { font-family: var(--font-mono); font-size: 0.75rem; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.follow[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .w { transition: none; } }
+.gen { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.gen button { font-family: var(--font-mono); font-size: 0.75rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); cursor: pointer; }
+.gen button:disabled { opacity: 0.6; cursor: progress; }
+.gen .gen-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-align: right; max-width: 22rem; }
+.gen .gen-msg.err { color: var(--wild); }
+.newer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; font-family: var(--font-mono); font-size: 0.8rem; }
+.newer button { font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 12px; border-radius: 999px; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; }
+.src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.footer-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
+
+.log h3 { font-family: var(--font-display); font-size: 1.1rem; margin: 0 0 8px; }
+.log ol { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.log li a { display: grid; grid-template-columns: 9.5rem 1fr auto; gap: 12px; align-items: baseline; padding: 12px 4px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.log li a:hover .log-sum { color: var(--accent); }
+.log li a[aria-current="true"] { background: var(--accent-soft); }
+.log-date { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.log-sum { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; }
+.log-n { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+@media (max-width: 520px) {
+  .log li a { grid-template-columns: 1fr auto; }
+  .log-sum { grid-column: 1 / -1; white-space: normal; }
+}
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; padding: 24px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .bar span { transition: width 0.2s linear; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <h1 id="page-title">Daily Digest</h1>
+    <div class="gen" id="gen" hidden>
+      <button type="button" id="gen-btn">New brief now</button>
+      <span class="gen-msg" id="gen-msg"></span>
+    </div>
+    <span class="sched" id="sched">New brief daily</span>
+  </header>
+
+  <div class="newer" id="newer" hidden>
+    <span>A newer brief is ready.</span>
+    <button type="button" id="newer-btn">Open it</button>
+  </div>
+
+  <main id="brief" aria-live="polite">
+    <div class="empty" id="loading">Loading the latest brief. Each run adds a new one here with its audio, the full transcript and the direct links.</div>
+  </main>
+
+  <section class="log" id="log" hidden>
+    <h3>All briefs</h3>
+    <ol id="log-list"></ol>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const fmtDate = (iso) => {
+    const d = new Date(iso + "T12:00:00Z");
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  };
+  const fmtTime = (s) => { if (!isFinite(s)) return "0:00"; s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+  const isWild = (t) => /^\s*(here'?s a wildcard|another wildcard|and a last wildcard|a last wildcard|wildcard)/i.test(t);
+  const words = (b) => [b.intro, ...b.items.map(i => i.text), b.outro].join(" ").split(/\s+/).filter(Boolean).length;
+  const summary = (b) => (b.headline || (b.items[0] && b.items[0].text) || "").replace(/\s+/g, " ");
+
+  let index = [];
+  let currentAudio = null;
+  let followText = true;
+  function setFollow(on, note) {
+    followText = on;
+    const fb = document.getElementById("follow");
+    if (fb) {
+      fb.setAttribute("aria-pressed", on ? "true" : "false");
+      fb.textContent = on ? "Follow text" : "Follow text: off";
+      fb.title = note || "";
+    }
+  }
+  // Scrolling by hand while the audio plays turns Follow text off; tap the button to turn it back on.
+  const manualScroll = () => { if (followText && currentAudio && !currentAudio.paused) setFollow(false, "Turned off because you scrolled. Tap to follow again."); };
+  window.addEventListener("wheel", manualScroll, { passive: true });
+  window.addEventListener("touchmove", manualScroll, { passive: true });
+  window.addEventListener("keydown", (e) => { if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key) && !(e.target && e.target.closest && e.target.closest("button, input, textarea, [role=slider]"))) manualScroll(); });
+  let stopSync = () => {};
+  let db = null;
+  let profile = {};
+  let mcp = null;
+  function scheduleLabel() {
+    if (!profile.time) return "New brief daily";
+    const [h, m] = String(profile.time).split(":").map(Number);
+    const d = new Date(Date.UTC(2020, 0, 1, h, m || 0));
+    const t = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).replace(":00", "").toLowerCase().replace(" ", "");
+    const zone = (profile.timezone_label || "").trim();
+    return "New brief daily · " + t + (zone ? " " + zone : "");
+  }
+  function applyProfile() {
+    const title = profile.name ? profile.name + "'s Daily Digest" : "Daily Digest";
+    $("#page-title").textContent = title;
+    try { document.title = title; } catch (e) {}
+    $("#sched").textContent = scheduleLabel();
+    const canGen = !!(mcp && profile.trigger_id);
+    $("#gen").hidden = !canGen;
+    $("#sched").hidden = canGen;
+    if (canGen && !$("#gen-msg").textContent) $("#gen-msg").textContent = scheduleLabel();
+  }
+  let votes = new Map();
+  const UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21h4V9H2v12zm20-11a2 2 0 0 0-2-2h-6.3l1-4.6v-.3c0-.4-.2-.8-.4-1.1L13.2 1 6.6 7.6C6.2 8 6 8.5 6 9v10c0 1.1.9 2 2 2h9c.8 0 1.5-.5 1.8-1.2l3-7.1c.1-.2.2-.5.2-.7v-2z"/></svg>';
+  const DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 3h-4v12h4V3zM2 14a2 2 0 0 0 2 2h6.3l-1 4.6v.3c0 .4.2.8.4 1.1l1.1 1 6.6-6.6c.4-.4.6-.9.6-1.4V5c0-1.1-.9-2-2-2H7c-.8 0-1.5.5-1.8 1.2l-3 7.1c-.1.2-.2.5-.2.7v2z"/></svg>';
+
+  function refreshVotes() {
+    document.querySelectorAll(".vote").forEach((bar) => {
+      const v = votes.get(bar.dataset.key);
+      bar.querySelector(".up").setAttribute("aria-pressed", v && v.vote === "up" ? "true" : "false");
+      bar.querySelector(".down").setAttribute("aria-pressed", v && v.vote === "down" ? "true" : "false");
+      bar.hidden = !db;
+    });
+    document.querySelectorAll(".vote-hint").forEach((h) => { h.hidden = !db; });
+  }
+
+  async function castVote(bar, brief, n, item, which) {
+    const key = bar.dataset.key;
+    const current = votes.get(key);
+    const ref = db.collection("feedback").doc(key);
+    const btns = bar.querySelectorAll("button");
+    const err = bar.querySelector(".vote-err");
+    btns.forEach(b => b.disabled = true);
+    err.textContent = "";
+    try {
+      if (current && current.vote === which) {
+        await ref.delete();
+        votes.delete(key);
+      } else {
+        const body = {
+          briefId: idOf(brief), date: brief.date, item: n + 1, vote: which,
+          text: item.text, source: item.source || "", wildcard: item.wildcard === true || isWild(item.text),
+          urls: (item.urls || []).map(u => typeof u === "string" ? u : u.url),
+          at: new Date().toISOString()
+        };
+        await ref.set(body);
+        votes.set(key, body);
+      }
+    } catch (e) {
+      err.textContent = "Couldn't save your vote. Try again.";
+    } finally {
+      btns.forEach(b => b.disabled = false);
+      refreshVotes();
+    }
+  }
+
+  (async () => {
+    try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+    if (!db) return;
+    try { const pd = await db.doc("config/profile").get(); if (pd.exists) { profile = pd.data() || {}; applyProfile(); } } catch (e) {}
+    refreshVotes();
+    db.collection("feedback").onSnapshot((snap) => {
+      votes = new Map(snap.docs.map(d => [d.id, d.data()]));
+      refreshVotes();
+    }, () => {});
+  })();
+  const idOf = (e) => e.id || e.date;
+  const seqOf = (e) => { const m = /-(\d+)$/.exec((e.id || "").slice(10)); return m ? Number(m[1]) : 1; };
+  const labelOf = (e) => fmtDate(e.date) + (index.filter(x => x.date === e.date).length > 1 ? " · #" + seqOf(e) : "");
+
+  async function getJSON(path) {
+    const r = await fetch(path, { cache: "no-store" });
+    if (!r.ok) throw new Error(path + " " + r.status);
+    return r.json();
+  }
+
+  function renderPlayer(b) {
+    const box = el("section", "player");
+    box.setAttribute("aria-label", "Audio");
+    const src = b.audio && b.audio.src;
+    if (!src) {
+      box.append(el("p", "audio-missing", b.audio && b.audio.note ? b.audio.note : "No audio for this brief."));
+    } else {
+      const audio = new Audio();
+      audio.preload = "metadata";
+      audio.src = src;
+      currentAudio = audio;
+      const row = el("div", "player-row");
+      const btn = el("button", "play");
+      btn.id = "play";
+      btn.type = "button";
+      btn.setAttribute("aria-label", "Play");
+      const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>';
+      const PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4.5v16H6zM13.5 4H18v16h-4.5z"/></svg>';
+      btn.innerHTML = PLAY;
+      const track = el("div", "track");
+      const bar = el("div", "bar"); const fill = el("span"); bar.append(fill);
+      bar.setAttribute("role", "slider"); bar.setAttribute("aria-label", "Seek"); bar.tabIndex = 0;
+      const times = el("div", "times"); const cur = el("span", null, "0:00"); const dur = el("span", null, "--:--"); times.append(cur, dur);
+      track.append(bar, times);
+      row.append(btn, track);
+      btn.addEventListener("click", () => { audio.paused ? audio.play().catch(() => {}) : audio.pause(); });
+      audio.addEventListener("play", () => { btn.innerHTML = PAUSE; btn.setAttribute("aria-label", "Pause"); });
+      audio.addEventListener("pause", () => { btn.innerHTML = PLAY; btn.setAttribute("aria-label", "Play"); });
+      audio.addEventListener("loadedmetadata", () => { dur.textContent = fmtTime(audio.duration); const rt = $("#runtime"); if (rt) rt.textContent = fmtTime(audio.duration) + " runtime"; });
+      audio.addEventListener("timeupdate", () => { cur.textContent = fmtTime(audio.currentTime); if (audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + "%"; });
+      audio.addEventListener("error", () => { dur.textContent = "unavailable"; });
+      const seek = (x) => { const r = bar.getBoundingClientRect(); if (audio.duration) audio.currentTime = Math.min(1, Math.max(0, (x - r.left) / r.width)) * audio.duration; };
+      bar.addEventListener("click", (e) => seek(e.clientX));
+      bar.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight") { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10); e.preventDefault(); }
+        if (e.key === "ArrowLeft") { audio.currentTime = Math.max(0, audio.currentTime - 10); e.preventDefault(); }
+      });
+      const foot = el("div", "player-foot");
+      const speeds = el("div", "speeds");
+      [1, 1.25, 1.5].forEach((s) => {
+        const sb = el("button", null, s + "x"); sb.type = "button"; sb.id = "speed-" + String(s).replace(".", "-");
+        sb.setAttribute("aria-pressed", s === 1 ? "true" : "false");
+        sb.addEventListener("click", () => { audio.playbackRate = s; speeds.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === sb ? "true" : "false")); });
+        speeds.append(sb);
+      });
+      foot.append(speeds);
+      if (b.timing && b.timing.length) {
+        const fb = el("button", "follow", followText ? "Follow text" : "Follow text: off"); fb.type = "button"; fb.id = "follow";
+        fb.setAttribute("aria-pressed", followText ? "true" : "false");
+        fb.addEventListener("click", () => {
+          setFollow(!followText);
+          if (followText) { const cur = document.querySelector(".w.on"); if (cur) cur.scrollIntoView({ block: "center", behavior: "smooth" }); }
+        });
+        speeds.append(fb);
+      }
+      if (b.audio.dropbox) {
+        const dl = el("a", "dropbox", "Open MP3 in Dropbox");
+        dl.href = b.audio.dropbox; dl.target = "_blank"; dl.rel = "noopener";
+        foot.append(dl);
+      }
+      box.append(row, foot);
+    }
+    return box;
+  }
+
+  function wordsInto(node, text, p) {
+    const toks = String(text || "").trim().split(/\s+/).filter(Boolean);
+    toks.forEach((tok, t) => {
+      const sp = el("span", "w", tok); sp.dataset.p = p; sp.dataset.t = t;
+      node.append(sp);
+      if (t < toks.length - 1) node.append(document.createTextNode(" "));
+    });
+    return node;
+  }
+
+  function wireSync(b, root) {
+    stopSync();
+    const audio = currentAudio;
+    if (!audio || !b.timing || !b.timing.length) return;
+    const spans = new Map();
+    root.querySelectorAll(".w").forEach(sp => spans.set(sp.dataset.p + ":" + sp.dataset.t, sp));
+    const T = b.timing.map(([p, t, st, en]) => ({ sp: spans.get(p + ":" + t), st, en })).filter(x => x.sp);
+    T.forEach(x => x.sp.addEventListener("click", () => { audio.currentTime = x.st / 1000; audio.play().catch(() => {}); }));
+    let on = null, raf = 0;
+    const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const find = (ms) => { let lo = 0, hi = T.length - 1, ans = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (T[mid].st <= ms) { ans = mid; lo = mid + 1; } else hi = mid - 1; } return ans; };
+    const paint = () => {
+      const ms = audio.currentTime * 1000;
+      const k = find(ms);
+      const hit = k >= 0 && ms <= T[k].en + 400 ? T[k].sp : null;
+      if (hit !== on) {
+        if (on) { on.classList.remove("on"); const s0 = on.closest(".seg"); if (s0) s0.classList.remove("live"); }
+        on = hit;
+        if (on) {
+          on.classList.add("on");
+          const s1 = on.closest(".seg"); if (s1) s1.classList.add("live");
+          if (followText && !audio.paused) {
+            const r = on.getBoundingClientRect();
+            if (r.top < 90 || r.bottom > window.innerHeight - 90) on.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+          }
+        }
+      }
+    };
+    const loop = () => { paint(); raf = requestAnimationFrame(loop); };
+    const onPlay = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); };
+    const onPause = () => { cancelAnimationFrame(raf); paint(); };
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("seeked", paint);
+    audio.addEventListener("ended", onPause);
+    stopSync = () => { cancelAnimationFrame(raf); audio.pause(); audio.removeEventListener("play", onPlay); audio.removeEventListener("pause", onPause); };
+  }
+
+  function renderBrief(b) {
+    const main = $("#brief");
+    main.replaceChildren();
+    const frag = el("div");
+    frag.style.display = "flex"; frag.style.flexDirection = "column"; frag.style.gap = "24px";
+
+    const head = el("div", "brief-head");
+    const wildCount = b.items.filter(i => i.wildcard === true || isWild(i.text)).length;
+    const entry = index.find(e => idOf(e) === idOf(b)) || b;
+    head.append(el("span", "eyebrow", index[0] && idOf(index[0]) === idOf(b) ? "Latest brief" : "Brief"));
+    head.append(el("h2", null, labelOf(entry)));
+    const stats = el("div", "stats");
+    stats.append(el("span", null, b.items.length + " items" + (wildCount ? " · " + wildCount + " wildcards" : "")));
+    stats.append(el("span", null, words(b) + " words"));
+    const rt = el("span", null, "~" + Math.max(1, Math.round(words(b) / 160)) + " min listen"); rt.id = "runtime"; stats.append(rt);
+    head.append(stats);
+
+    const tr = el("section", "transcript");
+    tr.append(el("h3", null, "Transcript"));
+    const hint = el("p", "vote-hint", "Vote on items and future briefs will lean toward what you like." + (b.timing && b.timing.length ? " Tap any word to jump the audio there." : ""));
+    hint.hidden = !db; tr.append(hint);
+    if (b.intro) tr.append(wordsInto(el("p", "say"), b.intro, 0));
+    b.items.forEach((item, n) => {
+      const wild = item.wildcard === true || isWild(item.text);
+      const seg = el("article", "seg" + (wild ? " wild" : ""));
+      seg.append(el("span", "seg-no", String(n + 1).padStart(2, "0")));
+      const body = el("div", "seg-body");
+      if (wild) body.append(el("span", "tag", "Wildcard"));
+      body.append(wordsInto(el("p"), item.text, n + 1));
+      const links = el("div", "links");
+      (item.urls || []).forEach((u) => {
+        const url = typeof u === "string" ? u : u.url;
+        const label = typeof u === "string" ? "" : (u.label || "");
+        if (!url) return;
+        const row = el("div", "link-row");
+        if (label) row.append(el("span", "link-label", label));
+        const a = el("a", null, url); a.href = url; a.target = "_blank"; a.rel = "noopener";
+        row.append(a); links.append(row);
+      });
+      if (links.childElementCount) body.append(links);
+      if (item.source) body.append(el("span", "src", item.source));
+      const bar = el("div", "vote");
+      bar.dataset.key = idOf(b).replace(/[^A-Za-z0-9_.~:@+-]/g, "_") + "_" + (n + 1);
+      const up = el("button", "up"); up.type = "button"; up.id = "up-" + bar.dataset.key;
+      up.innerHTML = UP + "<span>More like this</span>"; up.setAttribute("aria-pressed", "false");
+      const down = el("button", "down"); down.type = "button"; down.id = "down-" + bar.dataset.key;
+      down.innerHTML = DOWN + "<span>Less like this</span>"; down.setAttribute("aria-pressed", "false");
+      up.addEventListener("click", () => castVote(bar, b, n, item, "up"));
+      down.addEventListener("click", () => castVote(bar, b, n, item, "down"));
+      bar.append(up, down, el("span", "vote-err"));
+      bar.hidden = !db;
+      body.append(bar);
+      seg.append(body);
+      tr.append(seg);
+    });
+    if (b.outro) { const o = wordsInto(el("p", "say"), b.outro, b.items.length + 1); o.style.borderTop = "1px solid var(--line)"; tr.append(o); }
+
+    stopSync();
+    currentAudio = null;
+    frag.append(head, renderPlayer(b), tr);
+    if (b.footer) frag.append(el("p", "footer-note", b.footer));
+    main.append(frag);
+    wireSync(b, tr);
+    refreshVotes();
+    document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", a.dataset.id === idOf(b) ? "true" : "false"));
+  }
+
+  // On-demand brief: starts this person's digest Routine through the Claude Code Remote connector.
+  // The Routine id, name, time and time zone come from the profile saved on this page (db: config/profile).
+  const COOLDOWN_MS = 15 * 60 * 1000;
+  let genWatch = 0;
+  const genMsg = (text, err) => { const m = $("#gen-msg"); m.textContent = text; m.classList.toggle("err", !!err); };
+  const etTime = (d) => {
+    const tz = profile.timezone || undefined;
+    try { return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: tz, timeZoneName: "short" }); }
+    catch (e) { return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); }
+  };
+
+  function watchForNewBrief(knownCount) {
+    clearInterval(genWatch);
+    const started = Date.now();
+    genWatch = setInterval(async () => {
+      if (Date.now() - started > 20 * 60 * 1000) { clearInterval(genWatch); genMsg("Still working or it stalled. Reload in a few minutes."); return; }
+      try {
+        const fresh = await getJSON("briefs/index.json");
+        if (fresh.length > knownCount) {
+          clearInterval(genWatch);
+          index = fresh.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
+          renderLog(); show(idOf(index[0]), true);
+          genMsg("New brief is ready.");
+          $("#gen-btn").disabled = false;
+        }
+      } catch (e) {}
+    }, 30000);
+  }
+
+  async function requestBrief() {
+    const btn = $("#gen-btn");
+    btn.disabled = true;
+    genMsg("Starting a new brief…");
+    let recent = null;
+    try { if (db) { const d = await db.doc("control/on_demand").get(); recent = d.exists ? d.data() : null; } } catch (e) {}
+    if (recent && recent.at && Date.now() - Date.parse(recent.at) < COOLDOWN_MS && !btn.dataset.confirm) {
+      btn.dataset.confirm = "1"; btn.disabled = false; btn.textContent = "Start another anyway";
+      genMsg("One was started at " + etTime(new Date(recent.at)) + " and may still be running.");
+      return;
+    }
+    const now = new Date();
+    try {
+      await mcp.callTool("Claude Code Remote", "fire_trigger", {
+        trigger_id: profile.trigger_id,
+        text: "The owner tapped 'New brief now' on the digest page at " + etTime(now) + ". This is a real on-demand brief: follow RUNBOOK.md exactly, use the normal window since the last brief, and skip links already sent. If little is new, publish a short brief with what is new."
+      });
+      try { if (db) await db.doc("control/on_demand").set({ at: now.toISOString() }); } catch (e) {}
+      btn.textContent = "New brief now"; delete btn.dataset.confirm;
+      genMsg("Started at " + etTime(now) + ". It appears here in about 5 minutes.");
+      watchForNewBrief(index.length);
+    } catch (e) {
+      btn.disabled = false; btn.textContent = "New brief now"; delete btn.dataset.confirm;
+      const code = e && e.code;
+      if (code === "server_not_connected" || code === "selection_required") genMsg("Claude Code Remote isn't connected for you. Add it in claude.ai Settings, Connectors.", true);
+      else if (code === "needs_reauth") genMsg("Reconnect Claude Code Remote in claude.ai Settings, Connectors.", true);
+      else if (code === "not_in_manifest" || code === "not_granted" || code === "consent_required") genMsg("The page needs your permission to start runs. Tap again and choose Allow.", true);
+      else if (code === "tool_error") genMsg("The run didn't start: " + (e.message || "unknown error"), true);
+      else if (code === "server_unavailable" || code === "upstream_error") genMsg("Couldn't confirm it started. Wait a few minutes and reload before trying again.", true);
+      else genMsg("Couldn't start a brief (" + (code || "error") + "). Try again later.", true);
+    }
+  }
+
+  (async () => {
+    try { mcp = window.claude && window.claude.use ? await window.claude.use("mcp") : null; } catch (e) { mcp = null; }
+    if (!mcp) return;
+    $("#gen-btn").addEventListener("click", requestBrief);
+    applyProfile();
+  })();
+
+  function renderLog() {
+    const list = $("#log-list");
+    list.replaceChildren();
+    index.forEach((e) => {
+      const li = el("li");
+      const a = el("a");
+      a.href = "#d" + idOf(e); a.dataset.id = idOf(e);
+      a.append(el("span", "log-date", labelOf(e)), el("span", "log-sum", e.summary || ""), el("span", "log-n", (e.items || 0) + " items"));
+      a.addEventListener("click", (ev) => { ev.preventDefault(); show(idOf(e), true); });
+      li.append(a); list.append(li);
+    });
+    $("#log").hidden = index.length === 0;
+  }
+
+  async function show(id, scroll) {
+    try {
+      const b = await getJSON("briefs/" + id + ".json");
+      renderBrief(b);
+      if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      $("#brief").replaceChildren(el("div", "empty", "This brief could not be loaded. Pick another one below."));
+    }
+  }
+
+  async function start() {
+    try {
+      index = await getJSON("briefs/index.json");
+      index.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
+    } catch (e) {
+      $("#loading").textContent = "No briefs yet. The next scheduled run will add the first one here, with its audio, the full transcript and the direct links.";
+      return;
+    }
+    renderLog();
+    // Always open the newest brief. Older ones are one tap away in "All briefs".
+    if (index[0]) show(idOf(index[0]), false);
+    setInterval(checkForNewer, 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForNewer(); });
+  }
+
+  // When the page (or the Home Screen app) comes back into view, look for a newer brief.
+  async function checkForNewer() {
+    try {
+      const fresh = await getJSON("briefs/index.json");
+      fresh.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
+      if (!fresh[0] || (index[0] && idOf(fresh[0]) === idOf(index[0]))) return;
+      index = fresh;
+      renderLog();
+      const bar = $("#newer");
+      bar.hidden = false;
+      $("#newer-btn").onclick = () => { bar.hidden = true; show(idOf(index[0]), true); };
+    } catch (e) {}
+  }
+  start();
+})();
+</script>

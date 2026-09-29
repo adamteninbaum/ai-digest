@@ -1,0 +1,300 @@
+<title>Daily Digest Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Literata:opsz,wght@7..72,400;7..72,500&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one calm column that reads like a producer's booking sheet for your own daily show. Numbered steps are real order; the setup message is the payoff at the end. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #16201d;
+  --muted: #5a6864;
+  --line: #d6ddda;
+  --accent: #0e6b62;
+  --accent-soft: #dcefeb;
+  --warn: #8a4b0f;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Literata", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1514; --surface: #161e1c; --ink: #e2e9e6; --muted: #92a19c; --line: #26312e;
+    --accent: #5cc6b8; --accent-soft: #173330; --warn: #e0a569;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1514; --surface: #161e1c; --ink: #e2e9e6; --muted: #92a19c; --line: #26312e;
+  --accent: #5cc6b8; --accent-soft: #173330; --warn: #e0a569;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.55; padding-inline: 16px; padding-block: 32px 72px; }
+.wrap { max-width: 42rem; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+header { display: flex; flex-direction: column; gap: 10px; border-bottom: 2px solid var(--ink); padding-bottom: 18px; }
+.kicker { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2rem, 7vw, 2.8rem); line-height: 1.05; margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 60ch; }
+section.step { display: grid; grid-template-columns: 2.4rem 1fr; gap: 0 12px; }
+.num { font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent); padding-top: 4px; font-variant-numeric: tabular-nums; }
+.step-body { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; margin: 0; }
+.hint { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); margin: 0; }
+label.field { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+input[type=text], input[type=time], textarea, select {
+  font: inherit; font-family: var(--font-body); font-size: 1rem; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; min-width: 0;
+}
+textarea { min-height: 88px; resize: vertical; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible, .chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.chip span { display: inline-block; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 0.95rem; cursor: pointer; user-select: none; }
+.chip input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 14px; }
+.toggle { display: flex; gap: 10px; align-items: flex-start; font-size: 0.98rem; }
+.toggle input { margin-top: 5px; accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+.toggle small { display: block; color: var(--muted); font-size: 0.85rem; }
+.range { display: flex; align-items: center; gap: 12px; }
+.range input { flex: 1; accent-color: var(--accent); }
+.range output { font-family: var(--font-mono); font-size: 0.9rem; min-width: 2ch; text-align: right; font-variant-numeric: tabular-nums; }
+.out { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.out textarea { font-family: var(--font-mono); font-size: 0.78rem; min-height: 220px; background: var(--bg); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button.primary { font-family: var(--font-mono); font-size: 0.85rem; padding: 10px 18px; border-radius: 999px; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; }
+.status { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+.status.warn { color: var(--warn); }
+ol.next { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 6px; }
+ol.next li { padding-left: 4px; }
+code { font-family: var(--font-mono); font-size: 0.85em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="kicker">Daily Digest · setup</span>
+    <h1>Your own morning news show, two minutes long</h1>
+    <p class="lede">Answer a few questions and you'll get a setup message. Paste it into Claude and it builds you a private page with a new audio brief every day: transcript, direct links, and thumbs up/down buttons that teach it your taste.</p>
+  </header>
+
+  <form id="f" novalidate>
+    <div style="display:flex;flex-direction:column;gap:30px">
+      <section class="step">
+        <span class="num">01</span>
+        <div class="step-body">
+          <h2>Who's listening</h2>
+          <label class="field">First name (the brief greets you with it)
+            <input type="text" id="name" autocomplete="given-name" placeholder="Sam">
+          </label>
+        </div>
+      </section>
+
+      <section class="step">
+        <span class="num">02</span>
+        <div class="step-body">
+          <h2>What you want to hear about</h2>
+          <p class="hint">Pick any. Your own words below matter more than the boxes.</p>
+          <div class="chips" id="topics"></div>
+          <label class="field">In your own words, what are you into?
+            <textarea id="interests" placeholder="The Knicks, one-pan dinners, AI tools for my small design studio, anything about space telescopes"></textarea>
+          </label>
+          <label class="field">Anything to leave out?
+            <input type="text" id="avoid" placeholder="celebrity gossip, crypto prices">
+          </label>
+          <label class="field">Your city or area, for local news (optional)
+            <input type="text" id="local" placeholder="Chicago">
+          </label>
+        </div>
+      </section>
+
+      <section class="step">
+        <span class="num">03</span>
+        <div class="step-body">
+          <h2>Where the news comes from</h2>
+          <label class="toggle"><input type="checkbox" id="src-web" checked>
+            <span>The web<small>Top stories for your topics from Google News, plus Hacker News and Techmeme for tech.</small></span></label>
+          <label class="toggle"><input type="checkbox" id="src-nl">
+            <span>Newsletters in my Gmail<small>Reads the newsletters you already get. Needs your Gmail connected to Claude.</small></span></label>
+          <label class="field" id="senders-wrap" hidden>Newsletter senders (optional, one per line; leave empty and it finds them for you)
+            <textarea id="senders" placeholder="dan@tldrnewsletter.com&#10;newsletter@morningbrew.com"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="step">
+        <span class="num">04</span>
+        <div class="step-body">
+          <h2>Shape of the brief</h2>
+          <div class="row">
+            <label class="field">Stories per brief
+              <span class="range"><input type="range" id="items" min="3" max="10" value="6"><output id="items-out">6</output></span>
+            </label>
+            <label class="field">Wildcards (surprises outside your topics)
+              <span class="range"><input type="range" id="wild" min="0" max="3" value="2"><output id="wild-out">2</output></span>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">Audio length
+              <select id="minutes"><option value="1">About 1 minute</option><option value="2" selected>About 2 minutes</option><option value="3">About 3 minutes</option></select>
+            </label>
+            <label class="field">Voice
+              <select id="voice">
+                <option value="en-US-AndrewMultilingualNeural">Andrew (US, warm)</option>
+                <option value="en-US-AvaMultilingualNeural">Ava (US, bright)</option>
+                <option value="en-US-BrianMultilingualNeural">Brian (US, easygoing)</option>
+                <option value="en-US-EmmaMultilingualNeural">Emma (US, friendly)</option>
+                <option value="en-GB-RyanNeural">Ryan (UK)</option>
+                <option value="en-GB-SoniaNeural">Sonia (UK)</option>
+                <option value="en-AU-NatashaNeural">Natasha (Australia)</option>
+              </select>
+            </label>
+          </div>
+          <label class="field">Tone
+            <select id="tone">
+              <option value="conversational, like a smart friend catching you up">Conversational, like a friend catching you up</option>
+              <option value="crisp and to the point, like a news anchor">Crisp, like a news anchor</option>
+              <option value="warm and a little playful">Warm and a little playful</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="step">
+        <span class="num">05</span>
+        <div class="step-body">
+          <h2>When it arrives</h2>
+          <div class="row">
+            <label class="field">Ready by
+              <input type="time" id="time" value="07:30">
+            </label>
+            <label class="field">Time zone
+              <select id="tz"></select>
+            </label>
+          </div>
+          <label class="toggle"><input type="checkbox" id="ntfy">
+            <span>Phone alert with a direct link<small>Uses the free ntfy app. You'll get a private channel name to subscribe to.</small></span></label>
+        </div>
+      </section>
+
+      <section class="step">
+        <span class="num">06</span>
+        <div class="step-body">
+          <h2>Your setup message</h2>
+          <div class="out">
+            <textarea id="msg" readonly aria-label="Setup message"></textarea>
+            <div class="actions">
+              <button type="button" class="primary" id="copy">Copy setup message</button>
+              <span class="status" id="status" role="status"></span>
+            </div>
+            <ol class="next">
+              <li>Go to <code>claude.ai/code</code> and start a new session. You need a paid Claude plan with Claude Code.</li>
+              <li>Paste the message and send it. Claude builds your page and daily schedule, then makes your first brief.</li>
+              <li>Do the one or two settings it asks for (usually full network access, and Gmail if you picked newsletters).</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  const KIT = "https://github.com/adamteninbaum/daily-digest-kit";
+  const TOPICS = ["AI", "Tech & gadgets", "Business & markets", "Startups", "Personal finance", "US politics",
+    "World news", "Science", "Space", "Health & fitness", "Climate", "Sports", "Film & TV", "Music",
+    "Gaming", "Design & creative", "Food & cooking", "Travel", "Books", "Local news"];
+  const ZONES = [["America/New_York", "ET"], ["America/Chicago", "CT"], ["America/Denver", "MT"],
+    ["America/Phoenix", "Arizona"], ["America/Los_Angeles", "PT"], ["America/Anchorage", "Alaska"],
+    ["Pacific/Honolulu", "Hawaii"], ["Europe/London", "UK"], ["Europe/Paris", "Central Europe"],
+    ["Asia/Kolkata", "India"], ["Asia/Tokyo", "Japan"], ["Australia/Sydney", "Sydney"]];
+  const $ = (s) => document.querySelector(s);
+
+  const box = $("#topics");
+  TOPICS.forEach((t, i) => {
+    const lab = document.createElement("label"); lab.className = "chip";
+    const inp = document.createElement("input"); inp.type = "checkbox"; inp.value = t; inp.id = "topic-" + i;
+    const sp = document.createElement("span"); sp.textContent = t;
+    lab.append(inp, sp); box.append(lab);
+  });
+
+  let here = "America/New_York";
+  try { here = Intl.DateTimeFormat().resolvedOptions().timeZone || here; } catch (e) {}
+  const tzSel = $("#tz");
+  const known = ZONES.map(z => z[0]);
+  (known.includes(here) ? ZONES : [[here, ""], ...ZONES]).forEach(([id, label]) => {
+    const o = document.createElement("option"); o.value = id; o.textContent = label ? label + " (" + id + ")" : id;
+    if (id === here) o.selected = true; tzSel.append(o);
+  });
+
+  const zoneLabel = (tz) => {
+    const z = ZONES.find(x => x[0] === tz); if (z && /^[A-Z]T$/.test(z[1])) return z[1];
+    try {
+      const part = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date()).find(p => p.type === "timeZoneName");
+      return part ? part.value.replace(/^([A-Z])[DS]T$/, "$1T") : "";
+    } catch (e) { return ""; }
+  };
+  const randomTopic = () => {
+    const a = new Uint8Array(12); crypto.getRandomValues(a);
+    return "daily-digest-" + Array.from(a, b => "abcdefghijkmnpqrstuvwxyz23456789"[b % 32]).join("");
+  };
+  let ntfyTopic = "";
+
+  function profile() {
+    const topics = [...box.querySelectorAll("input:checked")].map(i => i.value);
+    const senders = $("#senders").value.split(/[\s,;]+/).map(s => s.trim()).filter(s => s.includes("@"));
+    if ($("#ntfy").checked && !ntfyTopic) ntfyTopic = randomTopic();
+    return {
+      name: $("#name").value.trim() || "there",
+      topics,
+      interests: $("#interests").value.trim(),
+      avoid: $("#avoid").value.trim(),
+      local_area: $("#local").value.trim(),
+      sources: { web: $("#src-web").checked, newsletters: $("#src-nl").checked, newsletter_senders: senders },
+      items: Number($("#items").value),
+      wildcards: Math.min(Number($("#wild").value), Number($("#items").value) - 1),
+      audio_minutes: Number($("#minutes").value),
+      voice: $("#voice").value,
+      tone: $("#tone").value,
+      time: $("#time").value || "07:30",
+      timezone: tzSel.value,
+      timezone_label: zoneLabel(tzSel.value),
+      alerts: { ntfy_topic: $("#ntfy").checked ? ntfyTopic : "" },
+      dropbox: false
+    };
+  }
+
+  function problems(p) {
+    const out = [];
+    if (!p.topics.length && !p.interests) out.push("Pick a topic or describe your interests.");
+    if (!p.sources.web && !p.sources.newsletters) out.push("Choose at least one source.");
+    return out;
+  }
+
+  function render() {
+    $("#items-out").textContent = $("#items").value;
+    $("#wild-out").textContent = $("#wild").value;
+    $("#senders-wrap").hidden = !$("#src-nl").checked;
+    const p = profile();
+    const issues = problems(p);
+    $("#msg").value = "Set up my Daily Digest. Follow SETUP.md in " + KIT + " exactly, step by step.\n\nMy profile:\n" + JSON.stringify(p, null, 2);
+    const st = $("#status");
+    st.textContent = issues.length ? issues.join(" ") : (p.alerts.ntfy_topic ? "Your ntfy channel: " + p.alerts.ntfy_topic : "");
+    st.classList.toggle("warn", issues.length > 0);
+  }
+
+  $("#f").addEventListener("input", render);
+  $("#f").addEventListener("change", render);
+  $("#f").addEventListener("submit", (e) => e.preventDefault());
+  $("#copy").addEventListener("click", async () => {
+    render();
+    const p = profile(); const issues = problems(p);
+    if (issues.length) { $("#status").textContent = issues.join(" "); $("#status").classList.add("warn"); return; }
+    const ta = $("#msg");
+    try { await navigator.clipboard.writeText(ta.value); $("#status").textContent = "Copied. Now paste it into a new Claude Code session."; $("#status").classList.remove("warn"); }
+    catch (e) { ta.focus(); ta.select(); $("#status").textContent = "Selected. Press Cmd+C (or Ctrl+C) to copy."; }
+  });
+  render();
+})();
+</script>
