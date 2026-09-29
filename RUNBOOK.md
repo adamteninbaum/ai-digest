@@ -135,9 +135,12 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   line under 200 characters, e.g. "AI digest ready: <top story> + <n-1> more. Open the
   AI Audio Digest page." If it says not sent, carry on: the Routine's own phone alert
   fires when the run ends, and it shows the step 9 summary.
-- Also send the ntfy alert (a banner that opens this brief directly when tapped):
-  `python3 notify.py <id> "<the top 2 stories in plain words>" <item count>`. Send both
-  every run; if either fails, note it in the step 9 summary and carry on.
+- REQUIRED on every run, scheduled or on-demand ("New brief now"): send the ntfy alert
+  (a banner that opens this brief directly when tapped):
+  `python3 notify.py <id> "<the top 2 stories in plain words>" <item count>`. It must print
+  `sent <id>`. If it fails, retry once. Never skip it, even for a short or on-demand brief.
+- Also send the PushNotification above. If either alert fails, note it in the step 9
+  summary and carry on.
 - Only if publishing fails: fall back to email. Run `python3 build_digest.py email
   digest.json "https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy"` (the page, as the listen link) and send ONE email with Gmail `send_message` to
   adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
@@ -148,4 +151,4 @@ This summary is what Adam's phone alert shows, so its first line must be "AI dig
 ready:" plus the top 2 stories in a few words. Then reply with a one-paragraph summary that
 starts with the page link
 (https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy): items sent, issues read, audio status
-(on the page or failed), links resolved vs fell back, HN status, anything that failed.
+(on the page or failed), ntfy (the `sent` id, or why it failed), links resolved vs fell back, HN status, anything that failed.
