@@ -15,8 +15,8 @@ published to a private claude.ai page: https://claude.ai/artifact/F5KSHeyUzh53Ab
   Hugging Face papers, smol.ai), judged alongside the newsletters.
 - `resolve_links.py`: follows tracking redirects and strips tracking params.
 - `dropbox_upload.py`: uploads the MP3 to Dropbox `/claude/ai_digest/` and prints a shared link.
-- `notify.py`: sends the phone alert (ntfy app, topic in the file) that opens the new
-  brief when tapped.
+- `notify.py`: optional ntfy phone alert (not used by default; the Claude iPhone app
+  alert is the default).
 - `preferences.md`: optional feedback the selection step reads each run.
 - Audio goes to Dropbox; the `audio` branch is only a fallback if Dropbox fails.
 

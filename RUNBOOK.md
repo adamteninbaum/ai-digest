@@ -135,16 +135,19 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   and leave the MP3 out of `files`.
 - Check it: `Artifact` action `list`, `scope` = `files`, `url` = the page; the new brief
   JSON and MP3 must be listed.
-- Phone alert (Adam's "text"): once the publish is confirmed, run
-  `python3 notify.py <id> "<one-line summary: the top 2 stories in plain words>" <item count>`.
-  It sends an ntfy push that opens this brief when tapped. If it fails, say so in the
-  step 9 summary; do not retry more than once and never fall back to email for it.
+- Phone alert: Adam gets alerts in the Claude iPhone app. Once the publish is confirmed,
+  load the `PushNotification` tool (ToolSearch `select:PushNotification`) and send one
+  line under 200 characters, e.g. "AI digest ready: <top story> + <n-1> more. Open the
+  AI Audio Digest page." If it says not sent, carry on: the Routine's own phone alert
+  fires when the run ends, and it shows the step 9 summary.
 - Only if publishing fails: fall back to email. Run `python3 build_digest.py email
   digest.json "<Dropbox link>"` and send ONE email with Gmail `send_message` to
   adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
   `htmlBody` = email.html, `body` = email.txt, verbatim.
 
 ## 9. Finish
-Reply in the session with a one-paragraph summary that starts with the page link
+This summary is what Adam's phone alert shows, so its first line must be "AI digest
+ready:" plus the top 2 stories in a few words. Then reply with a one-paragraph summary that
+starts with the page link
 (https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy): items sent, issues read, audio status
 (Dropbox or fallback), links resolved vs fell back, HN status, anything that failed.
