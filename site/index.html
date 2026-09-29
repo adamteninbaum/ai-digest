@@ -98,6 +98,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .gen button:disabled { opacity: 0.6; cursor: progress; }
 .gen .gen-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-align: right; max-width: 22rem; }
 .gen .gen-msg.err { color: var(--wild); }
+.newer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; font-family: var(--font-mono); font-size: 0.8rem; }
+.newer button { font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 12px; border-radius: 999px; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
 .footer-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
 
@@ -126,6 +128,11 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     </div>
     <span class="sched" id="sched">New brief daily · 9:30am ET</span>
   </header>
+
+  <div class="newer" id="newer" hidden>
+    <span>A newer brief is ready.</span>
+    <button type="button" id="newer-btn">Open it</button>
+  </div>
 
   <main id="brief" aria-live="polite">
     <div class="empty" id="loading">Loading the latest brief. Each run adds a new one here with its audio, the full transcript and the direct links.</div>
@@ -496,7 +503,6 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     try {
       const b = await getJSON("briefs/" + id + ".json");
       renderBrief(b);
-      try { history.replaceState(null, "", "#d" + id); } catch (e) {}
       if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       $("#brief").replaceChildren(el("div", "empty", "This brief could not be loaded. Pick another one below."));
@@ -512,9 +518,24 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       return;
     }
     renderLog();
-    const want = (location.hash || "").replace(/^#d/, "");
-    const pick = index.find(e => idOf(e) === want) || index[0];
-    if (pick) show(idOf(pick), false);
+    // Always open the newest brief. Older ones are one tap away in "All briefs".
+    if (index[0]) show(idOf(index[0]), false);
+    setInterval(checkForNewer, 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForNewer(); });
+  }
+
+  // When the page (or the Home Screen app) comes back into view, look for a newer brief.
+  async function checkForNewer() {
+    try {
+      const fresh = await getJSON("briefs/index.json");
+      fresh.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
+      if (!fresh[0] || (index[0] && idOf(fresh[0]) === idOf(index[0]))) return;
+      index = fresh;
+      renderLog();
+      const bar = $("#newer");
+      bar.hidden = false;
+      $("#newer-btn").onclick = () => { bar.hidden = true; show(idOf(index[0]), true); };
+    } catch (e) {}
   }
   start();
 })();
