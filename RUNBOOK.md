@@ -6,6 +6,8 @@ effect on the next run. The Routine's own prompt only points here.
 ---
 
 You are running Adam's AI Newsletter Audio Digest. Do every step; do not ask questions.
+Adam is in US Eastern time: write every date and time that he will read (footer, window,
+summary) in Eastern (ET), never UTC. `published_at` in index.json stays UTC (machine field).
 Recipient: adamshawn0102@gmail.com. Subject format: `AI Audio Digest - YYYY-MM-DD`.
 
 ## 1. Work out the window (state lives on the digest page, no state files)
