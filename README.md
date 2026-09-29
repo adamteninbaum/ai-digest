@@ -1,6 +1,6 @@
 # ai-digest
 
-Adam's AI Newsletter Audio Digest, run as a Claude Code cloud Routine every day at 11am Eastern (starts 10:52am) and
+Adam's AI Newsletter Audio Digest, run as a Claude Code cloud Routine every day at 9:30am Eastern (starts 9:22am) and
 published to a private claude.ai page: https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy
 
 - `RUNBOOK.md`: the prompt the Routine runs (fetch via Gmail connector, select, rank,

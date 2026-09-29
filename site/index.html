@@ -122,9 +122,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     <h1>AI Audio Digest</h1>
     <div class="gen" id="gen" hidden>
       <button type="button" id="gen-btn">New brief now</button>
-      <span class="gen-msg" id="gen-msg">New brief daily · 11am ET</span>
+      <span class="gen-msg" id="gen-msg">New brief daily · 9:30am ET</span>
     </div>
-    <span class="sched" id="sched">New brief daily · 11am ET</span>
+    <span class="sched" id="sched">New brief daily · 9:30am ET</span>
   </header>
 
   <main id="brief" aria-live="polite">
@@ -153,6 +153,20 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   let index = [];
   let currentAudio = null;
   let followText = true;
+  function setFollow(on, note) {
+    followText = on;
+    const fb = document.getElementById("follow");
+    if (fb) {
+      fb.setAttribute("aria-pressed", on ? "true" : "false");
+      fb.textContent = on ? "Follow text" : "Follow text: off";
+      fb.title = note || "";
+    }
+  }
+  // Scrolling by hand while the audio plays turns Follow text off; tap the button to turn it back on.
+  const manualScroll = () => { if (followText && currentAudio && !currentAudio.paused) setFollow(false, "Turned off because you scrolled. Tap to follow again."); };
+  window.addEventListener("wheel", manualScroll, { passive: true });
+  window.addEventListener("touchmove", manualScroll, { passive: true });
+  window.addEventListener("keydown", (e) => { if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key) && !(e.target && e.target.closest && e.target.closest("button, input, textarea, [role=slider]"))) manualScroll(); });
   let stopSync = () => {};
   let db = null;
   let votes = new Map();
@@ -265,9 +279,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       });
       foot.append(speeds);
       if (b.timing && b.timing.length) {
-        const fb = el("button", "follow", "Follow text"); fb.type = "button"; fb.id = "follow";
+        const fb = el("button", "follow", followText ? "Follow text" : "Follow text: off"); fb.type = "button"; fb.id = "follow";
         fb.setAttribute("aria-pressed", followText ? "true" : "false");
-        fb.addEventListener("click", () => { followText = !followText; fb.setAttribute("aria-pressed", followText ? "true" : "false"); });
+        fb.addEventListener("click", () => {
+          setFollow(!followText);
+          if (followText) { const cur = document.querySelector(".w.on"); if (cur) cur.scrollIntoView({ block: "center", behavior: "smooth" }); }
+        });
         speeds.append(fb);
       }
       if (b.audio.dropbox) {
