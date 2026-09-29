@@ -140,6 +140,9 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   line under 200 characters, e.g. "AI digest ready: <top story> + <n-1> more. Open the
   AI Audio Digest page." If it says not sent, carry on: the Routine's own phone alert
   fires when the run ends, and it shows the step 9 summary.
+- Also send the ntfy alert (a banner that opens this brief directly when tapped):
+  `python3 notify.py <id> "<the top 2 stories in plain words>" <item count>`. Send both
+  every run; if either fails, note it in the step 9 summary and carry on.
 - Only if publishing fails: fall back to email. Run `python3 build_digest.py email
   digest.json "<Dropbox link>"` and send ONE email with Gmail `send_message` to
   adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
