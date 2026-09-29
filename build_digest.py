@@ -4,7 +4,8 @@ email always matches the audio word for word.
 digest.json:
   {"date": "YYYY-MM-DD",
    "intro": "Hey Adam, ...",
-   "items": [{"text": "One or two spoken sentences.", "urls": ["https://clean.url"],
+   "items": [{"text": "One or two spoken sentences.",
+              "urls": ["https://article.url", {"url": "https://prompt.url", "label": "Detailed prompt"}],
               "source": "TLDR AI"}, ...],
    "outro": "That's it for this one.",
    "footer": "Window: ... Issues read: ... Buzz: ..."}
@@ -41,6 +42,10 @@ def write_script(d):
 
 
 def link(u):
+    if isinstance(u, dict):
+        label = html.escape(u.get("label", ""))
+        url = html.escape(u["url"], quote=True)
+        return (f"{label}: " if label else "") + f'<a href="{url}">{url}</a>'
     u = html.escape(u, quote=True)
     return f'<a href="{u}">{u}</a>'
 
@@ -59,7 +64,8 @@ def write_email(d, audio):
         src_t = f" ({src})" if src else ""
         h.append(f"<p>{esc(item['text'])}<br>"
                  + "<br>".join(f"&#8594; {link(u)}" for u in urls) + src_h + "</p>")
-        t += [item["text"], *(f"-> {u}" for u in urls[:-1]), *(f"-> {u}{src_t}" for u in urls[-1:]), ""]
+        flat = [u if isinstance(u, str) else (f"{u['label']}: " if u.get("label") else "") + u["url"] for u in urls]
+        t += [item["text"], *(f"-> {u}" for u in flat[:-1]), *(f"-> {u}{src_t}" for u in flat[-1:]), ""]
     h.append(f"<p>{esc(d['outro'])}</p>")
     t += [d["outro"], ""]
     if d.get("footer"):

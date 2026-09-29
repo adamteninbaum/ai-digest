@@ -75,6 +75,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .tag { align-self: flex-start; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--wild); background: var(--wild-soft); padding: 2px 8px; border-radius: 4px; }
 .links { display: flex; flex-direction: column; gap: 4px; }
 .links a { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.45; overflow-wrap: anywhere; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.link-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.link-label { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
 .footer-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
 
@@ -213,7 +215,15 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       if (wild) body.append(el("span", "tag", "Wildcard"));
       body.append(el("p", null, item.text));
       const links = el("div", "links");
-      (item.urls || []).forEach((u) => { const a = el("a", null, u); a.href = u; a.target = "_blank"; a.rel = "noopener"; links.append(a); });
+      (item.urls || []).forEach((u) => {
+        const url = typeof u === "string" ? u : u.url;
+        const label = typeof u === "string" ? "" : (u.label || "");
+        if (!url) return;
+        const row = el("div", "link-row");
+        if (label) row.append(el("span", "link-label", label));
+        const a = el("a", null, url); a.href = url; a.target = "_blank"; a.rel = "noopener";
+        row.append(a); links.append(row);
+      });
       if (links.childElementCount) body.append(links);
       if (item.source) body.append(el("span", "src", item.source));
       seg.append(body);

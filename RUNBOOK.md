@@ -59,7 +59,11 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 - `items`: one entry per pick, in buzz order. `text` is exactly what will be spoken for
   that item: a sentence or two on what it is and why it might matter to Adam,
   conversational, no URLs. For wildcards, say so in the text ("Here's a wildcard...").
-  `urls` holds the clean URL(s) from step 5; `source` is the newsletter name(s); set
+  `urls` holds the clean URL(s) from step 5. Include EVERY resource the spoken text
+  points to, not just the article: if it mentions a prompt, repo, demo, video, tool or
+  dataset that the newsletter linked, add that link too (resolved in step 5), as
+  `{"url": "...", "label": "Detailed prompt"}` so Adam can tell the links apart. Plain
+  strings are fine for the main article. `source` is the newsletter name(s); set
   `"wildcard": true` on wildcard items (the page tags them).
 - `date`: today, YYYY-MM-DD. On a manual test run also set `"test": true`.
 - `outro`: one short sign-off line.
