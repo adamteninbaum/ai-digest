@@ -9,7 +9,8 @@ You are running Adam's AI Newsletter Audio Digest. Do every step; do not ask que
 Recipient: adamshawn0102@gmail.com. Subject format: `AI Audio Digest - YYYY-MM-DD`.
 
 ## 1. Work out the window (state lives in Gmail, no state files)
-- Gmail search `in:sent subject:"AI Audio Digest"` and take the newest one. Its date is the
+- Gmail search `in:sent subject:"AI Audio Digest" -subject:test -subject:failed` and take
+  the newest one (test and failed runs never count as state). Its date is the
   last successful run. If none exists, use the last 4 days.
 - Read the last ~4 sent digests (get_thread, PLAIN_TEXT) and collect every URL in them.
   These are already-sent links; never send one again.
