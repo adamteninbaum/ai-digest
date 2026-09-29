@@ -5,11 +5,14 @@ published to a private claude.ai page: https://claude.ai/artifact/F5KSHeyUzh53Ab
 
 - `RUNBOOK.md`: the prompt the Routine runs (fetch via Gmail connector, select, rank,
   script, Edge TTS, Dropbox, page publish). State lives in the page's briefs/index.json.
-- `tts.py`: Edge TTS renderer that works behind the cloud session proxy.
+- `tts.py`: Edge TTS renderer that works behind the cloud session proxy; also saves
+  per-word timings so the page highlights each word as it is spoken.
 - `site/index.html`: the digest page. It reads `briefs/index.json`, `briefs/<date>.json`
   and `audio/*.mp3`, which each run publishes alongside it.
 - `build_digest.py`: turns digest.json into the TTS script, the page's brief files, and
   (fallback only) an email.
+- `discover.py`: today's hot AI stories online (Hacker News, Techmeme, Google News,
+  Hugging Face papers, smol.ai), judged alongside the newsletters.
 - `resolve_links.py`: follows tracking redirects and strips tracking params.
 - `dropbox_upload.py`: uploads the MP3 to Dropbox `/claude/ai_digest/` and prints a shared link.
 - `preferences.md`: optional feedback the selection step reads each run.

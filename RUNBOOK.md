@@ -29,6 +29,24 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
   6 to 12 per daily window); do not sample or skim a subset. Wildcards come from the long tail.
 - Ignore sponsor/ad blocks, job boards, referral and unsubscribe links.
 
+## 2b. Look online for what is hot right now (not just the newsletters)
+- `pip install -q -r requirements.txt && python3 discover.py 24` (use the window length in
+  hours if it is longer). It returns today's AI stories from Hacker News (with points and
+  comments), Techmeme, Google News, Hugging Face's most upvoted papers and smol.ai's daily
+  roundup when it is fresh. A source that fails is listed under `errors`; carry on.
+- Also run 2 or 3 `WebSearch` queries such as "AI news today", "new AI model release
+  this week", "AI video OR 3D animation tool launch" to catch anything big the feeds miss.
+- These are CANDIDATES, judged exactly like newsletter items in steps 3 and 4. A story
+  that is both in the newsletters and hot online gets a buzz boost. Aim for at least 1 or
+  2 items per brief that came from online discovery and were NOT in the newsletters, when
+  something good is there; label their `source` by where you found them (e.g.
+  "Hacker News, 663 points" or "Techmeme").
+- Google News links are Google wrappers: replace each with the publisher's own article
+  URL (search the headline) before step 5. Techmeme links point at Techmeme's page; use
+  the original article it cites. For Hacker News items, link the article and add the
+  discussion as `{"url": "<HN thread>", "label": "HN discussion"}` when it is lively.
+- Open (WebFetch) any online story you pick, so the spoken summary is accurate.
+
 ## 3. Select 4 to 7 items (daily brief)
 - Known lanes: 3D animation and motion design tooling; generative video and image models;
   VFX; creative production workflow; AI agents and automation; solo/small-business AI
@@ -92,7 +110,8 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 ## 7. Audio
 - `python3 build_digest.py script digest.json` (writes script.txt), then
   `python3 tts.py script.txt AI-Audio-Digest-<id>.mp3` (Edge TTS; handles the cloud
-  proxy's CA bundle).
+  proxy's CA bundle). It also writes `AI-Audio-Digest-<id>.words.json`, the timing of
+  every spoken word, which the page uses to highlight words as they are read.
 - Save it to Dropbox: `python3 dropbox_upload.py AI-Audio-Digest-<id>.mp3`. It uploads
   to `/claude/ai_digest/` and prints a Dropbox shared link. It needs DROPBOX_APP_KEY,
   DROPBOX_APP_SECRET and DROPBOX_REFRESH_TOKEN, set on the cloud environment. The Dropbox
@@ -105,8 +124,8 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 ## 8. Publish to the digest page (this replaces email)
 Adam does not want email: the Gmail connector wraps every link in a Google redirect page.
 - `python3 build_digest.py site digest.json out "<Dropbox link>" "<local path of the
-  briefs/index.json you read in step 1>"` writes `out/briefs/<id>.json` and a merged
-  `out/briefs/index.json`.
+  briefs/index.json you read in step 1>" AI-Audio-Digest-<id>.words.json` writes
+  `out/briefs/<id>.json` (with word timings) and a merged `out/briefs/index.json`.
 - Republish the page with the `Artifact` tool, action `publish`:
   `url` = https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy, `file_path` = `site/index.html` from this repo, and `files` =
   `{"briefs/index.json": "out/briefs/index.json", "briefs/<id>.json": "out/briefs/<id>.json",

@@ -86,6 +86,13 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .vote button:disabled { opacity: 0.6; cursor: progress; }
 .vote .vote-err { font-family: var(--font-mono); font-size: 0.72rem; color: var(--wild); }
 .vote-hint { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); margin: 0; }
+.w { border-radius: 3px; cursor: pointer; transition: background-color 0.12s, box-shadow 0.12s; }
+.w:hover { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px; }
+.w.on { background: var(--accent); box-shadow: 0 0 0 2px var(--accent); color: var(--bg); }
+.seg.live .seg-no { color: var(--accent); }
+.follow { font-family: var(--font-mono); font-size: 0.75rem; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.follow[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .w { transition: none; } }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
 .footer-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
 
@@ -135,6 +142,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   const summary = (b) => (b.headline || (b.items[0] && b.items[0].text) || "").replace(/\s+/g, " ");
 
   let index = [];
+  let currentAudio = null;
+  let followText = true;
+  let stopSync = () => {};
   let db = null;
   let votes = new Map();
   const UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 21h4V9H2v12zm20-11a2 2 0 0 0-2-2h-6.3l1-4.6v-.3c0-.4-.2-.8-.4-1.1L13.2 1 6.6 7.6C6.2 8 6 8.5 6 9v10c0 1.1.9 2 2 2h9c.8 0 1.5-.5 1.8-1.2l3-7.1c.1-.2.2-.5.2-.7v-2z"/></svg>';
@@ -209,6 +219,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       const audio = new Audio();
       audio.preload = "metadata";
       audio.src = src;
+      currentAudio = audio;
       const row = el("div", "player-row");
       const btn = el("button", "play");
       btn.id = "play";
@@ -244,6 +255,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         speeds.append(sb);
       });
       foot.append(speeds);
+      if (b.timing && b.timing.length) {
+        const fb = el("button", "follow", "Follow text"); fb.type = "button"; fb.id = "follow";
+        fb.setAttribute("aria-pressed", followText ? "true" : "false");
+        fb.addEventListener("click", () => { followText = !followText; fb.setAttribute("aria-pressed", followText ? "true" : "false"); });
+        speeds.append(fb);
+      }
       if (b.audio.dropbox) {
         const dl = el("a", "dropbox", "Open MP3 in Dropbox");
         dl.href = b.audio.dropbox; dl.target = "_blank"; dl.rel = "noopener";
@@ -252,6 +269,54 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       box.append(row, foot);
     }
     return box;
+  }
+
+  function wordsInto(node, text, p) {
+    const toks = String(text || "").trim().split(/\s+/).filter(Boolean);
+    toks.forEach((tok, t) => {
+      const sp = el("span", "w", tok); sp.dataset.p = p; sp.dataset.t = t;
+      node.append(sp);
+      if (t < toks.length - 1) node.append(document.createTextNode(" "));
+    });
+    return node;
+  }
+
+  function wireSync(b, root) {
+    stopSync();
+    const audio = currentAudio;
+    if (!audio || !b.timing || !b.timing.length) return;
+    const spans = new Map();
+    root.querySelectorAll(".w").forEach(sp => spans.set(sp.dataset.p + ":" + sp.dataset.t, sp));
+    const T = b.timing.map(([p, t, st, en]) => ({ sp: spans.get(p + ":" + t), st, en })).filter(x => x.sp);
+    T.forEach(x => x.sp.addEventListener("click", () => { audio.currentTime = x.st / 1000; audio.play().catch(() => {}); }));
+    let on = null, raf = 0;
+    const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const find = (ms) => { let lo = 0, hi = T.length - 1, ans = -1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (T[mid].st <= ms) { ans = mid; lo = mid + 1; } else hi = mid - 1; } return ans; };
+    const paint = () => {
+      const ms = audio.currentTime * 1000;
+      const k = find(ms);
+      const hit = k >= 0 && ms <= T[k].en + 400 ? T[k].sp : null;
+      if (hit !== on) {
+        if (on) { on.classList.remove("on"); const s0 = on.closest(".seg"); if (s0) s0.classList.remove("live"); }
+        on = hit;
+        if (on) {
+          on.classList.add("on");
+          const s1 = on.closest(".seg"); if (s1) s1.classList.add("live");
+          if (followText && !audio.paused) {
+            const r = on.getBoundingClientRect();
+            if (r.top < 90 || r.bottom > window.innerHeight - 90) on.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+          }
+        }
+      }
+    };
+    const loop = () => { paint(); raf = requestAnimationFrame(loop); };
+    const onPlay = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(loop); };
+    const onPause = () => { cancelAnimationFrame(raf); paint(); };
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("seeked", paint);
+    audio.addEventListener("ended", onPause);
+    stopSync = () => { cancelAnimationFrame(raf); audio.pause(); audio.removeEventListener("play", onPlay); audio.removeEventListener("pause", onPause); };
   }
 
   function renderBrief(b) {
@@ -273,16 +338,16 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 
     const tr = el("section", "transcript");
     tr.append(el("h3", null, "Transcript"));
-    const hint = el("p", "vote-hint", "Vote on items and future briefs will lean toward what you like.");
+    const hint = el("p", "vote-hint", "Vote on items and future briefs will lean toward what you like." + (b.timing && b.timing.length ? " Tap any word to jump the audio there." : ""));
     hint.hidden = !db; tr.append(hint);
-    if (b.intro) tr.append(el("p", "say", b.intro));
+    if (b.intro) tr.append(wordsInto(el("p", "say"), b.intro, 0));
     b.items.forEach((item, n) => {
       const wild = item.wildcard === true || isWild(item.text);
       const seg = el("article", "seg" + (wild ? " wild" : ""));
       seg.append(el("span", "seg-no", String(n + 1).padStart(2, "0")));
       const body = el("div", "seg-body");
       if (wild) body.append(el("span", "tag", "Wildcard"));
-      body.append(el("p", null, item.text));
+      body.append(wordsInto(el("p"), item.text, n + 1));
       const links = el("div", "links");
       (item.urls || []).forEach((u) => {
         const url = typeof u === "string" ? u : u.url;
@@ -309,11 +374,14 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       seg.append(body);
       tr.append(seg);
     });
-    if (b.outro) { const o = el("p", "say", b.outro); o.style.borderTop = "1px solid var(--line)"; tr.append(o); }
+    if (b.outro) { const o = wordsInto(el("p", "say"), b.outro, b.items.length + 1); o.style.borderTop = "1px solid var(--line)"; tr.append(o); }
 
+    stopSync();
+    currentAudio = null;
     frag.append(head, renderPlayer(b), tr);
     if (b.footer) frag.append(el("p", "footer-note", b.footer));
     main.append(frag);
+    wireSync(b, tr);
     refreshVotes();
     document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", a.dataset.id === idOf(b) ? "true" : "false"));
   }

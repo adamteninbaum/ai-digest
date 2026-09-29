@@ -16,11 +16,12 @@ Usage:
   python3 build_digest.py nextid EXISTING_INDEX_JSON DATE
       -> prints the id for a new brief: DATE, or DATE-2, DATE-3... if that day already has
          briefs. Put it in digest.json as "id" and use it in the MP3 file name.
-  python3 build_digest.py site digest.json OUT_DIR [DROPBOX_URL] [EXISTING_INDEX_JSON]
+  python3 build_digest.py site digest.json OUT_DIR [DROPBOX_URL] [EXISTING_INDEX_JSON] [WORDS_JSON]
       -> writes OUT_DIR/briefs/<date>.json and OUT_DIR/briefs/index.json (merged with the
          existing index read from the published page), for publishing to the digest page.
          The MP3 is expected at audio/AI-Audio-Digest-<id>.mp3 on the page. Existing briefs
-         are never replaced; a second brief on the same day gets its own id.
+         are never replaced; a second brief on the same day gets its own id. WORDS_JSON is the
+         .words.json tts.py wrote; with it the page highlights each word as it is spoken.
 
 Items may set "wildcard": true; the page tags those.
 """
@@ -98,7 +99,40 @@ def next_id(index, date):
     return f"{date}-{n}"
 
 
-def write_site(d, out, dropbox="", existing=""):
+def _norm(t):
+    return "".join(ch for ch in t.lower() if ch.isalnum())
+
+
+def align(paragraphs, words):
+    """Map TTS word timings onto transcript tokens.
+
+    Tokens are each paragraph split on whitespace, the same split the page does in JS
+    (text.trim().split(/\s+/)). Returns [[paragraph, token, start_ms, end_ms], ...].
+    """
+    tokens = [(p, t, _norm(tok)) for p, text in enumerate(paragraphs)
+              for t, tok in enumerate(text.split())]
+    out, i = [], 0
+    for w in words:
+        wn = _norm(w["text"])
+        if not wn:
+            continue
+        window = range(i, min(i + 8, len(tokens)))
+        hit = next((j for j in window if tokens[j][2] == wn), None)
+        if hit is None:
+            hit = next((j for j in window if tokens[j][2] and (wn in tokens[j][2] or tokens[j][2] in wn)), None)
+        if hit is None:
+            continue
+        p, t, _ = tokens[hit]
+        if out and out[-1][0] == p and out[-1][1] == t:
+            out[-1][3] = w["end"]  # several spoken words inside one token ("5.5", "$1B")
+        else:
+            out.append([p, t, w["start"], w["end"]])
+        # stay on a token until its last spoken part ("twelve" "million" "view")
+        i = hit + 1 if tokens[hit][2].endswith(wn) or wn.endswith(tokens[hit][2]) else hit
+    return out
+
+
+def write_site(d, out, dropbox="", existing="", words_path=""):
     date = d["date"]
     index = read_index(existing)
     bid = d.get("id") or next_id(index, date)
@@ -109,6 +143,11 @@ def write_site(d, out, dropbox="", existing=""):
         brief["audio"]["dropbox"] = dropbox
     if d.get("audio_note"):
         brief["audio"] = {"note": d["audio_note"]}
+    elif words_path and os.path.exists(words_path):
+        with open(words_path, encoding="utf-8") as fh:
+            words = json.load(fh)
+        paragraphs = [d.get("intro", "")] + [i["text"] for i in d["items"]] + [d.get("outro", "")]
+        brief["timing"] = align(paragraphs, words)
     summary = d.get("headline") or (d["items"][0]["text"] if d["items"] else "")
     index = [e for e in index if (e.get("id") or e["date"]) != bid]
     index.append({"id": bid, "date": date, "items": len(d["items"]), "summary": " ".join(summary.split())[:160],
@@ -135,7 +174,7 @@ if __name__ == "__main__":
     if sys.argv[1] == "site":
         if len(sys.argv) < 4:
             sys.exit("site needs OUT_DIR")
-        write_site(digest, sys.argv[3], *(sys.argv[4:6]))
+        write_site(digest, sys.argv[3], *(sys.argv[4:7]))
     elif sys.argv[1] == "script":
         write_script(digest)
     else:
