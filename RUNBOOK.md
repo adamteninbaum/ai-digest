@@ -8,12 +8,15 @@ effect on the next run. The Routine's own prompt only points here.
 You are running Adam's AI Newsletter Audio Digest. Do every step; do not ask questions.
 Recipient: adamshawn0102@gmail.com. Subject format: `AI Audio Digest - YYYY-MM-DD`.
 
-## 1. Work out the window (state lives in Gmail, no state files)
-- Gmail search `in:sent subject:"AI Audio Digest" -subject:test -subject:failed` and take
-  the newest one (test and failed runs never count as state). Its date is the
-  last successful run. If none exists, use the last 4 days.
-- Read the last ~4 sent digests (get_thread, PLAIN_TEXT) and collect every URL in them.
-  These are already-sent links; never send one again.
+## 1. Work out the window (state lives on the digest page, no state files)
+The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private claude.ai Artifact Adam owns).
+- `Artifact` action `read` with `url` = the page (required before you can republish it).
+- `Artifact` action `read` with `url` = the page and `path` = `briefs/index.json`; it saves
+  the file locally and tells you where. Keep that path for step 8.
+- The newest entry whose `test` is not true: its `published_at` is the last successful
+  run. If there is none, use the last 4 days.
+- Read the newest ~4 briefs (`path` = `briefs/<date>.json`) and collect every URL in their
+  items. These are already-sent links; never send one again.
 
 ## 2. Fetch newsletters
 - Query: `from:(news@daily.therundown.ai OR superhuman@mail.joinsuperhuman.ai OR dan@tldrnewsletter.com OR bensbites@substack.com OR post-training@mail.aitinkerers.org) after:<last run as YYYY/MM/DD>`
@@ -50,13 +53,15 @@ Recipient: adamshawn0102@gmail.com. Subject format: `AI Audio Digest - YYYY-MM-D
   (tracking params stripped) when a link cannot be resolved.
 - Use the resolved URLs everywhere below, and when checking against already-sent links.
 
-## 6. Write the digest file (single source for audio AND email)
+## 6. Write the digest file (single source for the audio AND the page)
 Write `digest.json` in the format documented at the top of `build_digest.py`:
 - `intro`: one short spoken opening line.
 - `items`: one entry per pick, in buzz order. `text` is exactly what will be spoken for
   that item: a sentence or two on what it is and why it might matter to Adam,
   conversational, no URLs. For wildcards, say so in the text ("Here's a wildcard...").
-  `urls` holds the clean URL(s) from step 5; `source` is the newsletter name(s).
+  `urls` holds the clean URL(s) from step 5; `source` is the newsletter name(s); set
+  `"wildcard": true` on wildcard items (the page tags them).
+- `date`: today, YYYY-MM-DD. On a manual test run also set `"test": true`.
 - `outro`: one short sign-off line.
 - `footer`: window covered, issues read, "Buzz = newsletter overlap (+ HN points when
   reachable)".
@@ -70,21 +75,31 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   to `/claude/ai_digest/` and prints a Dropbox shared link. It needs DROPBOX_APP_KEY,
   DROPBOX_APP_SECRET and DROPBOX_REFRESH_TOKEN, set on the cloud environment. The Dropbox
   connector cannot upload binary files, so this uses the Dropbox HTTP API.
-- Fallback only if the Dropbox upload fails: commit the MP3 to `audio/` on the `audio`
-  branch of adamteninbaum/ai-digest, push, use
-  `https://github.com/adamteninbaum/ai-digest/blob/audio/audio/<file>.mp3` as the audio
-  link, and add "Dropbox upload failed: <reason>" to the footer.
-- If TTS fails entirely, use the audio link text "Audio unavailable this run: <reason>".
+- If the Dropbox upload fails, carry on without the Dropbox link (pass "" in step 8) and
+  add "Dropbox upload failed: <reason>" to the footer. The page still plays the MP3,
+  because step 8 publishes it alongside the page.
+- If TTS fails entirely, see step 8 (`audio_note`).
 
-## 8. Deliver
-- `python3 build_digest.py email digest.json "<audio link>"` writes email.html and
-  email.txt: the Dropbox audio link at the top (as a button and the full URL), then the
-  full transcript of the audio, word for word, with each item's full clickable URL(s)
-  and source directly under that item's paragraph, then the footer.
-- Send ONE email with Gmail `send_message` to adamshawn0102@gmail.com, subject
-  `AI Audio Digest - YYYY-MM-DD`: `htmlBody` = contents of email.html, `body` = contents
-  of email.txt, pasted verbatim. Do not rewrite or summarize them.
+## 8. Publish to the digest page (this replaces email)
+Adam does not want email: the Gmail connector wraps every link in a Google redirect page.
+- `python3 build_digest.py site digest.json out "<Dropbox link>" "<local path of the
+  briefs/index.json you read in step 1>"` writes `out/briefs/<date>.json` and a merged
+  `out/briefs/index.json`.
+- Republish the page with the `Artifact` tool, action `publish`:
+  `url` = https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy, `file_path` = `site/index.html` from this repo, and `files` =
+  `{"briefs/index.json": "out/briefs/index.json", "briefs/<date>.json": "out/briefs/<date>.json",
+  "audio/AI-Audio-Digest-<date>.mp3": "<the MP3 path>"}`. Do not pass `icon`,
+  `capabilities` or `force`. Files you leave out (older briefs and audio) are kept.
+- If TTS failed, set `"audio_note": "Audio unavailable this run: <reason>"` in digest.json
+  and leave the MP3 out of `files`.
+- Check it: `Artifact` action `list`, `scope` = `files`, `url` = the page; the new brief
+  JSON and MP3 must be listed.
+- Only if publishing fails: fall back to email. Run `python3 build_digest.py email
+  digest.json "<Dropbox link>"` and send ONE email with Gmail `send_message` to
+  adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
+  `htmlBody` = email.html, `body` = email.txt, verbatim.
 
 ## 9. Finish
-Reply in the session with a one-paragraph summary: items sent, issues read, audio status
+Reply in the session with a one-paragraph summary that starts with the page link
+(https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy): items sent, issues read, audio status
 (Dropbox or fallback), links resolved vs fell back, HN status, anything that failed.

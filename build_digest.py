@@ -11,8 +11,16 @@ digest.json:
 
 Usage:
   python3 build_digest.py script digest.json            -> writes script.txt (for tts.py)
-  python3 build_digest.py email digest.json AUDIO_URL   -> writes email.html and email.txt
+  python3 build_digest.py email digest.json AUDIO_URL   -> writes email.html and email.txt (fallback only)
+  python3 build_digest.py site digest.json OUT_DIR [DROPBOX_URL] [EXISTING_INDEX_JSON]
+      -> writes OUT_DIR/briefs/<date>.json and OUT_DIR/briefs/index.json (merged with the
+         existing index read from the published page), for publishing to the digest page.
+         The MP3 is expected at audio/AI-Audio-Digest-<date>.mp3 on the page.
+
+Items may set "wildcard": true; the page tags those.
 """
+import os
+from datetime import datetime, timezone
 import html
 import json
 import sys
@@ -63,11 +71,40 @@ def write_email(d, audio):
         fh.write("\n".join(t) + "\n")
 
 
+def write_site(d, out, dropbox="", existing=""):
+    date = d["date"]
+    brief = {k: d[k] for k in ("date", "intro", "items", "outro", "footer", "headline") if k in d}
+    brief["audio"] = {"src": f"audio/AI-Audio-Digest-{date}.mp3"}
+    if dropbox:
+        brief["audio"]["dropbox"] = dropbox
+    if d.get("audio_note"):
+        brief["audio"] = {"note": d["audio_note"]}
+    index = []
+    if existing and os.path.exists(existing):
+        with open(existing, encoding="utf-8") as fh:
+            index = json.load(fh)
+    summary = d.get("headline") or (d["items"][0]["text"] if d["items"] else "")
+    index = [e for e in index if e.get("date") != date]
+    index.append({"date": date, "items": len(d["items"]), "summary": " ".join(summary.split())[:160],
+                  "published_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                  "test": bool(d.get("test"))})
+    index.sort(key=lambda e: e["date"], reverse=True)
+    os.makedirs(os.path.join(out, "briefs"), exist_ok=True)
+    with open(os.path.join(out, "briefs", f"{date}.json"), "w", encoding="utf-8") as fh:
+        json.dump(brief, fh, ensure_ascii=False, indent=1)
+    with open(os.path.join(out, "briefs", "index.json"), "w", encoding="utf-8") as fh:
+        json.dump(index, fh, ensure_ascii=False, indent=1)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3 or sys.argv[1] not in ("script", "email"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("script", "email", "site"):
         sys.exit(__doc__)
     digest = load(sys.argv[2])
-    if sys.argv[1] == "script":
+    if sys.argv[1] == "site":
+        if len(sys.argv) < 4:
+            sys.exit("site needs OUT_DIR")
+        write_site(digest, sys.argv[3], *(sys.argv[4:6]))
+    elif sys.argv[1] == "script":
         write_script(digest)
     else:
         if len(sys.argv) < 4:
