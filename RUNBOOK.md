@@ -1,7 +1,7 @@
 # AI Audio Digest: Routine runbook
 
-This is the exact prompt the cloud Routine sends each firing. Keep it in sync with the
-Routine (`mcp__Claude_Code_Remote__update_trigger`) if you edit it.
+The cloud Routine clones this repo and follows this file step by step, so edits here take
+effect on the next run. The Routine's own prompt only points here.
 
 ---
 
