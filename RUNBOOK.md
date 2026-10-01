@@ -117,18 +117,13 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   `python3 tts.py script.txt AI-Audio-Digest-<id>.mp3` (Edge TTS; handles the cloud
   proxy's CA bundle). It also writes `AI-Audio-Digest-<id>.words.json`, the timing of
   every spoken word, which the page uses to highlight words as they are read.
-- Save it to Dropbox: `python3 dropbox_upload.py AI-Audio-Digest-<id>.mp3`. It uploads
-  to `/claude/ai_digest/` and prints a Dropbox shared link. It needs DROPBOX_APP_KEY,
-  DROPBOX_APP_SECRET and DROPBOX_REFRESH_TOKEN, set on the cloud environment. The Dropbox
-  connector cannot upload binary files, so this uses the Dropbox HTTP API.
-- If the Dropbox upload fails, carry on without the Dropbox link (pass "" in step 8) and
-  add "Dropbox upload failed: <reason>" to the footer. The page still plays the MP3,
-  because step 8 publishes it alongside the page.
+- Do NOT upload to Dropbox. Adam no longer wants Dropbox copies; the MP3 lives only on
+  the digest page (step 8).
 - If TTS fails entirely, see step 8 (`audio_note`).
 
 ## 8. Publish to the digest page (this replaces email)
 Adam does not want email: the Gmail connector wraps every link in a Google redirect page.
-- `python3 build_digest.py site digest.json out "<Dropbox link>" "<local path of the
+- `python3 build_digest.py site digest.json out "" "<local path of the
   briefs/index.json you read in step 1>" AI-Audio-Digest-<id>.words.json` writes
   `out/briefs/<id>.json` (with word timings) and a merged `out/briefs/index.json`.
 - Republish the page with the `Artifact` tool, action `publish`:
@@ -145,11 +140,14 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   line under 200 characters, e.g. "AI digest ready: <top story> + <n-1> more. Open the
   AI Audio Digest page." If it says not sent, carry on: the Routine's own phone alert
   fires when the run ends, and it shows the step 9 summary.
-- Also send the ntfy alert (a banner that opens this brief directly when tapped):
-  `python3 notify.py <id> "<the top 2 stories in plain words>" <item count>`. Send both
-  every run; if either fails, note it in the step 9 summary and carry on.
+- REQUIRED on every run, scheduled or on-demand ("New brief now"): send the ntfy alert
+  (a banner that opens this brief directly when tapped):
+  `python3 notify.py <id> "<the top 2 stories in plain words>" <item count>`. It must print
+  `sent <id>`. If it fails, retry once. Never skip it, even for a short or on-demand brief.
+- Also send the PushNotification above. If either alert fails, note it in the step 9
+  summary and carry on.
 - Only if publishing fails: fall back to email. Run `python3 build_digest.py email
-  digest.json "<Dropbox link>"` and send ONE email with Gmail `send_message` to
+  digest.json "https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy"` (the page, as the listen link) and send ONE email with Gmail `send_message` to
   adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
   `htmlBody` = email.html, `body` = email.txt, verbatim.
 
@@ -158,4 +156,4 @@ This summary is what Adam's phone alert shows, so its first line must be "AI dig
 ready:" plus the top 2 stories in a few words. Then reply with a one-paragraph summary that
 starts with the page link
 (https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy): items sent, issues read, audio status
-(Dropbox or fallback), links resolved vs fell back, HN status, anything that failed.
+(on the page or failed), ntfy (the `sent` id, or why it failed), links resolved vs fell back, HN status, anything that failed.
