@@ -116,6 +116,10 @@ code { font-family: var(--font-mono); font-size: 0.85em; background: var(--accen
             <span>The web<small>Top stories for your topics from Google News, plus Hacker News and Techmeme for tech.</small></span></label>
           <label class="toggle"><input type="checkbox" id="src-nl">
             <span>Newsletters in my Gmail<small>Reads the newsletters you already get. Needs your Gmail connected to Claude.</small></span></label>
+          <label class="toggle"><input type="checkbox" id="src-ol">
+            <span>Newsletters in my Outlook<small>Same, for your Outlook or work email. Only outside newsletters are read, never internal mail. Needs Microsoft 365 connected to Claude.</small></span></label>
+          <label class="toggle" id="fwd-wrap" hidden><input type="checkbox" id="src-fwd" checked>
+            <span>Include newsletters forwarded to me<small>If someone forwards you a newsletter or article roundup, it goes in too.</small></span></label>
           <label class="field" id="senders-wrap" hidden>Newsletter senders (optional, one per line; leave empty and it finds them for you)
             <textarea id="senders" placeholder="dan@tldrnewsletter.com&#10;newsletter@morningbrew.com"></textarea>
           </label>
@@ -190,7 +194,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; background: var(--accen
             <ol class="next">
               <li>Go to <code>claude.ai/code</code> and start a new session. You need a paid Claude plan with Claude Code.</li>
               <li>Paste the message and send it. Claude builds your page and daily schedule, then makes your first brief.</li>
-              <li>Do the one or two settings it asks for (usually full network access, and Gmail if you picked newsletters).</li>
+              <li>Do the one or two settings it asks for (usually full network access, and Gmail or Microsoft 365 if you picked newsletters).</li>
             </ol>
           </div>
         </div>
@@ -251,7 +255,7 @@ code { font-family: var(--font-mono); font-size: 0.85em; background: var(--accen
       interests: $("#interests").value.trim(),
       avoid: $("#avoid").value.trim(),
       local_area: $("#local").value.trim(),
-      sources: { web: $("#src-web").checked, newsletters: $("#src-nl").checked, newsletter_senders: senders },
+      sources: { web: $("#src-web").checked, newsletters: $("#src-nl").checked, outlook: $("#src-ol").checked, newsletter_senders: senders },
       items: Number($("#items").value),
       wildcards: Math.min(Number($("#wild").value), Number($("#items").value) - 1),
       audio_minutes: Number($("#minutes").value),
@@ -268,14 +272,14 @@ code { font-family: var(--font-mono); font-size: 0.85em; background: var(--accen
   function problems(p) {
     const out = [];
     if (!p.topics.length && !p.interests) out.push("Pick a topic or describe your interests.");
-    if (!p.sources.web && !p.sources.newsletters) out.push("Choose at least one source.");
+    if (!p.sources.web && !p.sources.newsletters && !p.sources.outlook) out.push("Choose at least one source.");
     return out;
   }
 
   function render() {
     $("#items-out").textContent = $("#items").value;
     $("#wild-out").textContent = $("#wild").value;
-    $("#senders-wrap").hidden = !$("#src-nl").checked;
+    $("#senders-wrap").hidden = !$("#src-nl").checked && !$("#src-ol").checked;
     const p = profile();
     const issues = problems(p);
     $("#msg").value = "Set up my Daily Digest. Follow SETUP.md in " + KIT + " exactly, step by step.\n\nMy profile:\n" + JSON.stringify(p, null, 2);

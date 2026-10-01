@@ -24,7 +24,12 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
 ## 2. Fetch newsletters
 - Query: `from:(news@daily.therundown.ai OR superhuman@mail.joinsuperhuman.ai OR dan@tldrnewsletter.com OR bensbites@substack.com OR post-training@mail.aitinkerers.org) after:<last run as YYYY/MM/DD>`
   then drop anything older than the exact last-run timestamp.
-- Dedupe by subject line (The Rundown arrives twice, to adamshawn0102@ and
+- Forwarded newsletters: also search `after:<last run as YYYY/MM/DD> (subject:Fwd OR
+  subject:Fw OR "Forwarded message" OR "Begin forwarded message") -in:sent`. Keep the ones
+  whose forwarded content is a newsletter or article roundup (not personal threads,
+  receipts or work requests), whatever the original sender, and name the original
+  newsletter as the source (e.g. "Morning Brew, forwarded by Jamie").
+- Dedupe by subject line, ignoring a leading "Fwd:"/"Fw:" (The Rundown arrives twice, to adamshawn0102@ and
   solomon.m.teninbaum@). Read EVERY unique issue in full with PLAIN_TEXT (typically
   6 to 12 per daily window); do not sample or skim a subset. Wildcards come from the long tail.
 - Ignore sponsor/ad blocks, job boards, referral and unsubscribe links.
