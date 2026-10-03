@@ -102,6 +102,12 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   `{"url": "...", "label": "Detailed prompt"}` so Adam can tell the links apart. Plain
   strings are fine for the main article. `source` is the newsletter name(s); set
   `"wildcard": true` on wildcard items (the page tags them).
+- `origin` on every item, so the page can badge it: `"gmail"` if it came from a newsletter
+  in Adam's Gmail (forwarded ones too), `"web"` if it came only from online discovery
+  (step 2b), `"both"` if it was in a newsletter AND hot online.
+- `media_urls` (optional): if the newsletter or article points to an interesting image,
+  demo video, X post with a video, or YouTube video for this item, list those links here
+  (resolved). Step 6b tries them first, then the item's `urls`.
 - `date`: today, YYYY-MM-DD. On a manual test run also set `"test": true`.
 - `id`: run `python3 build_digest.py nextid "<local briefs/index.json from step 1>" <date>`
   and use what it prints (the date, or date-2, date-3... if today already has a brief).
@@ -111,6 +117,18 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   reachable)".
 - Total spoken length about 150 to 300 words (1 to 2 minutes). On a slow day use fewer
   items and a shorter script; never pad with weak picks.
+
+## 6b. Images and video (shown right in the brief)
+- `python3 media.py digest.json` finds one image or video per item (from `media_urls`,
+  then the article pages: X posts, YouTube, og:image/og:video, `<video>` tags), saves it
+  under `media/`, writes `media` into each item in digest.json, and prints the `files`
+  entries for step 8. Videos up to 14 MB play on the page; YouTube and bigger videos show
+  as a poster that opens the video.
+- Look at every saved image (Read the .jpg) and keep only ones worth seeing: product shots,
+  demo stills, screenshots, charts, diagrams, real photos of the thing. Drop logos, generic
+  social cards, stock photos and headshots: set that item's `"media": []` in digest.json and
+  leave its files out of step 8. Keep every playable video unless it is clearly unrelated.
+- If it fails, carry on without media and say so in the step 9 summary.
 
 ## 7. Audio
 - `python3 build_digest.py script digest.json` (writes script.txt), then
@@ -129,7 +147,8 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
 - Republish the page with the `Artifact` tool, action `publish`:
   `url` = https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy, `file_path` = `site/index.html` from this repo, and `files` =
   `{"briefs/index.json": "out/briefs/index.json", "briefs/<id>.json": "out/briefs/<id>.json",
-  "audio/AI-Audio-Digest-<id>.mp3": "<the MP3 path>"}`. Do not pass `icon`,
+  "audio/AI-Audio-Digest-<id>.mp3": "<the MP3 path>"}` plus every `media/...` entry step 6b
+  printed and you kept. Do not pass `icon`,
   `capabilities` or `force`. Files you leave out (older briefs and audio) are kept.
 - If TTS failed, set `"audio_note": "Audio unavailable this run: <reason>"` in digest.json
   and leave the MP3 out of `files`.
@@ -156,4 +175,4 @@ This summary is what Adam's phone alert shows, so its first line must be "AI dig
 ready:" plus the top 2 stories in a few words. Then reply with a one-paragraph summary that
 starts with the page link
 (https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy): items sent, issues read, audio status
-(on the page or failed), ntfy (the `sent` id, or why it failed), links resolved vs fell back, HN status, anything that failed.
+(on the page or failed), media (how many items got an image or video), ntfy (the `sent` id, or why it failed), links resolved vs fell back, HN status, anything that failed.

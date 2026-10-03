@@ -101,6 +101,17 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .newer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; font-family: var(--font-mono); font-size: 0.8rem; }
 .newer button { font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 12px; border-radius: 999px; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.origin { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.origin.gmail { color: var(--accent); border-color: var(--accent); }
+.origin.web { color: var(--ink); }
+.media { margin: 2px 0 0; display: block; max-width: 100%; }
+.media img, .media video { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.media video { aspect-ratio: 16 / 9; object-fit: contain; background: #000; }
+.media-link { position: relative; display: block; text-decoration: none; color: var(--ink); }
+.media-link .playbadge { position: absolute; inset: 0; display: grid; place-items: center; }
+.media-link .playbadge span { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 0.78rem; padding: 8px 14px; border-radius: 999px; background: var(--ink); color: var(--bg); }
+.media-link .playbadge svg { width: 14px; height: 14px; fill: currentColor; }
 .footer-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; margin: 0; }
 
 .log h3 { font-family: var(--font-display); font-size: 1.1rem; margin: 0 0 8px; }
@@ -265,7 +276,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       track.append(bar, times);
       row.append(btn, track);
       btn.addEventListener("click", () => { audio.paused ? audio.play().catch(() => {}) : audio.pause(); });
-      audio.addEventListener("play", () => { btn.innerHTML = PAUSE; btn.setAttribute("aria-label", "Pause"); });
+      audio.addEventListener("play", () => { btn.innerHTML = PAUSE; btn.setAttribute("aria-label", "Pause"); document.querySelectorAll(".media video").forEach((v) => v.pause()); });
       audio.addEventListener("pause", () => { btn.innerHTML = PLAY; btn.setAttribute("aria-label", "Play"); });
       audio.addEventListener("loadedmetadata", () => { dur.textContent = fmtTime(audio.duration); const rt = $("#runtime"); if (rt) rt.textContent = fmtTime(audio.duration) + " runtime"; });
       audio.addEventListener("timeupdate", () => { cur.textContent = fmtTime(audio.currentTime); if (audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + "%"; });
@@ -352,6 +363,45 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     stopSync = () => { cancelAnimationFrame(raf); audio.pause(); audio.removeEventListener("play", onPlay); audio.removeEventListener("pause", onPause); };
   }
 
+  // Where an item came from: "gmail", "web" or "both" (set by the run; older briefs are inferred from the source).
+  const WEB_SRC = /hacker news|techmeme|google news|hugging face|smol\.ai|websearch|web search|online|reddit/i;
+  function originOf(item) {
+    let o = item.origin;
+    if (!o && item.source) {
+      const web = WEB_SRC.test(item.source);
+      const mail = item.source.split(/,|\+| and /).some((p) => p.trim() && !WEB_SRC.test(p));
+      o = web && mail ? "both" : web ? "web" : "gmail";
+    }
+    if (o === "gmail") return { cls: "gmail", text: "From your Gmail" };
+    if (o === "web") return { cls: "web", text: "Found online" };
+    if (o === "both") return { cls: "gmail", text: "Gmail + online" };
+    return null;
+  }
+
+  // One image or video per item, published alongside the page under media/.
+  function mediaEl(m) {
+    const fig = el("figure", "media");
+    if (m.type === "video" && m.src) {
+      const v = document.createElement("video");
+      v.src = m.src; v.controls = true; v.playsInline = true; v.preload = "metadata";
+      if (m.poster) v.poster = m.poster;
+      v.addEventListener("play", () => { if (currentAudio && !currentAudio.paused) currentAudio.pause(); });
+      fig.append(v);
+    } else if (m.type === "link" && m.poster) {
+      const a = el("a", "media-link"); a.href = m.url; a.target = "_blank"; a.rel = "noopener";
+      const img = document.createElement("img"); img.src = m.poster; img.alt = m.label || "Video"; img.loading = "lazy";
+      const badge = el("span", "playbadge"); const pill = el("span");
+      pill.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>';
+      pill.append(document.createTextNode(m.label || "Watch the video"));
+      badge.append(pill); a.append(img, badge); fig.append(a);
+    } else if (m.type === "image" && m.src) {
+      const img = document.createElement("img"); img.src = m.src; img.alt = m.alt || ""; img.loading = "lazy";
+      if (m.w && m.h) { img.width = m.w; img.height = m.h; }
+      fig.append(img);
+    }
+    return fig;
+  }
+
   function renderBrief(b) {
     const main = $("#brief");
     main.replaceChildren();
@@ -381,6 +431,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       const body = el("div", "seg-body");
       if (wild) body.append(el("span", "tag", "Wildcard"));
       body.append(wordsInto(el("p"), item.text, n + 1));
+      (item.media || []).slice(0, 1).forEach((m) => body.append(mediaEl(m)));
       const links = el("div", "links");
       (item.urls || []).forEach((u) => {
         const url = typeof u === "string" ? u : u.url;
@@ -392,7 +443,13 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         row.append(a); links.append(row);
       });
       if (links.childElementCount) body.append(links);
-      if (item.source) body.append(el("span", "src", item.source));
+      const o = originOf(item);
+      if (o || item.source) {
+        const mr = el("div", "meta-row");
+        if (o) mr.append(el("span", "origin " + o.cls, o.text));
+        if (item.source) mr.append(el("span", "src", item.source));
+        body.append(mr);
+      }
       const bar = el("div", "vote");
       bar.dataset.key = idOf(b).replace(/[^A-Za-z0-9_.~:@+-]/g, "_") + "_" + (n + 1);
       const up = el("button", "up"); up.type = "button"; up.id = "up-" + bar.dataset.key;
