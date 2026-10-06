@@ -53,6 +53,11 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .player-row { display: flex; align-items: center; gap: 14px; }
 .play { flex: none; width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; display: grid; place-items: center; }
 .play svg { width: 20px; height: 20px; fill: currentColor; }
+.skip { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+.skip svg { width: 16px; height: 16px; fill: currentColor; }
+.skip:hover { border-color: var(--muted); }
+.skip:disabled { opacity: 0.35; cursor: default; }
+.item-pos { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .track { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .bar { position: relative; height: 8px; border-radius: 4px; background: var(--accent-soft); cursor: pointer; }
 .bar span { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 4px; background: var(--accent); }
@@ -275,6 +280,46 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       const times = el("div", "times"); const cur = el("span", null, "0:00"); const dur = el("span", null, "--:--"); times.append(cur, dur);
       track.append(bar, times);
       row.append(btn, track);
+      // Previous / next item: jump between the intro, each item and the sign-off using the word timings.
+      const starts = [];
+      (b.timing || []).forEach(([p, , st]) => { if (starts[p] == null || st < starts[p]) starts[p] = st; });
+      const segs = [];
+      starts.forEach((ms, p) => { if (ms != null) segs.push({ p, s: ms / 1000 }); });
+      if (segs.length > 1) {
+        const SKIP_PREV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>';
+        const SKIP_NEXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 5H18v14h-2.5zM4 5v14l10.5-7z"/></svg>';
+        const prevBtn = el("button", "skip"); prevBtn.type = "button"; prevBtn.id = "prev-item"; prevBtn.innerHTML = SKIP_PREV;
+        prevBtn.setAttribute("aria-label", "Previous item"); prevBtn.title = "Previous item";
+        const nextBtn = el("button", "skip"); nextBtn.type = "button"; nextBtn.id = "next-item"; nextBtn.innerHTML = SKIP_NEXT;
+        nextBtn.setAttribute("aria-label", "Next item"); nextBtn.title = "Next item";
+        const nItems = b.items.length;
+        const curSeg = () => { let k = 0; segs.forEach((x, i) => { if (x.s <= audio.currentTime + 0.25) k = i; }); return k; };
+        const go = (i) => { audio.currentTime = segs[i].s; if (audio.paused) audio.play().catch(() => {}); };
+        const toNext = () => { const k = curSeg(); if (k < segs.length - 1) go(k + 1); };
+        const toPrev = () => { const k = curSeg(); go(audio.currentTime - segs[k].s > 3 || k === 0 ? k : k - 1); };
+        nextBtn.addEventListener("click", toNext);
+        prevBtn.addEventListener("click", toPrev);
+        const pos = el("span", "item-pos", "Intro");
+        const syncPos = () => {
+          const p = segs[curSeg()].p;
+          pos.textContent = p === 0 ? "Intro" : p > nItems ? "Sign-off" : "Item " + p + " of " + nItems;
+          const k = curSeg();
+          prevBtn.disabled = k === 0 && audio.currentTime < 3;
+          nextBtn.disabled = k >= segs.length - 1;
+        };
+        audio.addEventListener("timeupdate", syncPos);
+        audio.addEventListener("seeked", syncPos);
+        syncPos();
+        row.replaceChildren(prevBtn, btn, nextBtn, track);
+        cur.after(pos);
+        // Lock screen, AirPods and car controls skip items too.
+        if ("mediaSession" in navigator) {
+          try {
+            navigator.mediaSession.setActionHandler("nexttrack", toNext);
+            navigator.mediaSession.setActionHandler("previoustrack", toPrev);
+          } catch (e) {}
+        }
+      }
       btn.addEventListener("click", () => { audio.paused ? audio.play().catch(() => {}) : audio.pause(); });
       audio.addEventListener("play", () => { btn.innerHTML = PAUSE; btn.setAttribute("aria-label", "Pause"); document.querySelectorAll(".media video").forEach((v) => v.pause()); });
       audio.addEventListener("pause", () => { btn.innerHTML = PLAY; btn.setAttribute("aria-label", "Play"); });
