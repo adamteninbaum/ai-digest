@@ -26,6 +26,8 @@ do not make a new brief, and do not change any other brief.
     `"audio_note"` with the new reason.
   - Links: if he names a bad link, re-resolve it with `resolve_links.py` or find the
     correct direct URL with WebSearch.
+  - Voice: if he mentions the voice ("new voice", "re-record"), re-render the audio
+    with step 7 so it uses his current pick, even if the brief already has audio.
   - Anything else he describes (wrong fact, item to drop, garbled wording): edit
     digest.json accordingly. If an item's spoken text changes, the audio must be
     re-rendered too.
@@ -156,8 +158,12 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 - If it fails, carry on without media and say so in the step 9 summary.
 
 ## 7. Audio
+- Adam's voice pick: `ArtifactData` action `get`, `url` = the page, `collection` =
+  `control`, `doc_id` = `voice`. Use its `voice` field as VOICE_ID (e.g. `edge_andrew`,
+  `am_michael`, `bm_george`, `af_heart`). If the doc is missing or the read fails, use
+  `edge_andrew`.
 - `python3 build_digest.py script digest.json` (writes script.txt), then
-  `python3 tts.py script.txt AI-Audio-Digest-<id>.mp3` (Edge TTS, retried 3 times; if
+  `python3 tts.py script.txt AI-Audio-Digest-<id>.mp3 <VOICE_ID>` (Edge TTS, retried 3 times; if
   Microsoft refuses it falls back to the local Kokoro voice automatically and prints
   `engine: kokoro`. Say which engine was used in the step 9 summary). It also writes `AI-Audio-Digest-<id>.words.json`, the timing of
   every spoken word, which the page uses to highlight words as they are read.

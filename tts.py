@@ -1,15 +1,18 @@
 """Render a digest script to MP3, plus word timings for the page.
 
-Usage: python3 tts.py SCRIPT.txt OUT.mp3 [VOICE]
+Usage: python3 tts.py SCRIPT.txt OUT.mp3 [VOICE_ID]
+VOICE_ID is Adam's pick from the page's voice picker (db doc control/voice):
+"edge_andrew" (default) or a Kokoro voice id such as "am_michael", "bm_george", "af_heart".
 Writes OUT.mp3 and OUT.words.json: [{"text": "Hey", "start": 50, "end": 310}, ...] in
 milliseconds, one entry per spoken word, which build_digest.py turns into the page's
 word-by-word highlighting.
 
-Engines, in order:
+With "edge_andrew" (or any id ending in "Neural"), engines in order:
 1. Edge TTS (Microsoft neural voice). Tried 3 times with backoff. Microsoft's free
    endpoint sometimes refuses connections (HTTP 403) for hours at a time.
 2. Kokoro (open model, runs on this machine's CPU, no network needed once the ~120 MB
    model is downloaded from GitHub). Word timings are estimated per paragraph.
+Any Kokoro voice id skips Edge and renders with that voice directly.
 Set TTS_ENGINE=kokoro to skip Edge. The last stdout line is "engine: edge" or
 "engine: kokoro"; the script exits non-zero only if both fail.
 
@@ -95,7 +98,7 @@ def kokoro_model():
     return paths
 
 
-def kokoro(text, out):
+def kokoro(text, out, voice=KOKORO_VOICE):
     try:
         from kokoro_onnx import Kokoro
     except ImportError:
@@ -111,7 +114,8 @@ def kokoro(text, out):
     gap_s = 0.35
     chunks, words, t, sr = [], [], 0.0, 24000
     for para in paragraphs:
-        samples, sr = k.create(para, voice=KOKORO_VOICE, speed=1.05, lang="en-us")
+        samples, sr = k.create(para, voice=voice, speed=1.05,
+                               lang="en-gb" if voice.startswith("b") else "en-us")
         dur = len(samples) / sr
         # Estimate word timings: spread the paragraph's duration by word length.
         toks = para.split()
@@ -135,18 +139,21 @@ def kokoro(text, out):
 
 def main(src, out, voice):
     text = open(src, encoding="utf-8").read().strip()
-    if os.environ.get("TTS_ENGINE", "").lower() != "kokoro":
+    voice = (voice or "edge_andrew").strip()
+    edge_voice = EDGE_VOICE if voice.startswith("edge_") else voice if voice.endswith("Neural") else None
+    if edge_voice and os.environ.get("TTS_ENGINE", "").lower() != "kokoro":
         try:
-            edge(text, out, voice)
-            print("engine: edge")
+            edge(text, out, edge_voice)
+            print(f"engine: edge {edge_voice}")
             return
         except Exception as e:  # noqa: BLE001
             print(f"{e}; falling back to Kokoro", file=sys.stderr)
-    kokoro(text, out)
-    print("engine: kokoro")
+    kv = KOKORO_VOICE if edge_voice else voice
+    kokoro(text, out, kv)
+    print(f"engine: kokoro {kv}")
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         sys.exit(__doc__)
-    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else EDGE_VOICE)
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "edge_andrew")

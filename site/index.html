@@ -110,6 +110,22 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .fix input { flex: 1 1 14rem; min-width: 0; font: inherit; font-size: 0.85rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; }
 .fix .fix-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); flex-basis: 100%; }
 .fix .fix-msg.err { color: var(--wild); }
+.voices summary { cursor: pointer; font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; list-style: none; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.voices summary::-webkit-details-marker { display: none; }
+.voices summary .cur { font-family: var(--font-mono); font-weight: 400; font-size: 0.75rem; color: var(--muted); }
+.voices summary::after { content: "Change"; font-family: var(--font-mono); font-weight: 400; font-size: 0.72rem; color: var(--accent); margin-left: auto; }
+.voices[open] summary::after { content: "Close"; }
+.voice-note { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); margin: 10px 0 0; }
+.voice-list { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.voice-list li { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.voice-list .vplay { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+.voice-list .vplay svg { width: 14px; height: 14px; fill: currentColor; }
+.voice-list .vplay[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.voice-list .vname { font-family: var(--font-display); font-weight: 500; font-size: 1rem; line-height: 1.2; }
+.voice-list .vdesc { display: block; font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+.voice-list .vuse { font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.voice-list .vuse[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); cursor: default; }
+.voice-list .vuse:disabled:not([aria-pressed="true"]) { opacity: 0.6; cursor: progress; }
 .newer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; font-family: var(--font-mono); font-size: 0.8rem; }
 .newer button { font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 12px; border-radius: 999px; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
@@ -160,6 +176,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   <main id="brief" aria-live="polite">
     <div class="empty" id="loading">Loading the latest brief. Each run adds a new one here with its audio, the full transcript and the direct links.</div>
   </main>
+
+  <details class="voices" id="voices">
+    <summary>Voice <span class="cur" id="voice-cur"></span></summary>
+    <p class="voice-note" id="voice-note">Tap play to hear a sample. Your pick is used from the next brief on.</p>
+    <ul class="voice-list" id="voice-list"></ul>
+  </details>
 
   <section class="log" id="log" hidden>
     <h3>All briefs</h3>
@@ -658,6 +680,76 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     $("#sched").hidden = true;
     $("#gen-btn").addEventListener("click", requestBrief);
     document.querySelectorAll("[data-fix]").forEach(n => { n.hidden = false; });
+  })();
+
+  // Voice picker. Samples live under voices/; the pick is saved to the page's db (control/voice)
+  // and the Routine reads it before rendering audio.
+  const VOICES = [
+    { id: "edge_andrew", name: "Andrew", desc: "American male · Microsoft · the original voice. Uses Michael when Microsoft's service is down (as it is now)." },
+    { id: "am_michael", name: "Michael", desc: "American male · the backup voice used for today's brief" },
+    { id: "am_fenrir", name: "Fenrir", desc: "American male" },
+    { id: "am_puck", name: "Puck", desc: "American male" },
+    { id: "am_adam", name: "Adam", desc: "American male" },
+    { id: "bm_george", name: "George", desc: "British male" },
+    { id: "bm_fable", name: "Fable", desc: "British male" },
+    { id: "af_heart", name: "Heart", desc: "American female · Kokoro's top-rated voice" },
+    { id: "af_bella", name: "Bella", desc: "American female" },
+    { id: "bf_emma", name: "Emma", desc: "British female" }
+  ];
+  const DEFAULT_VOICE = "edge_andrew";
+  let chosenVoice = DEFAULT_VOICE, sample = null, sampleBtn = null;
+  const PLAY_S = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const STOP_S = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>';
+  function stopSample() {
+    if (sample) { sample.pause(); sample = null; }
+    if (sampleBtn) { sampleBtn.innerHTML = PLAY_S; sampleBtn.setAttribute("aria-pressed", "false"); sampleBtn.setAttribute("aria-label", sampleBtn.dataset.label); sampleBtn = null; }
+  }
+  function renderVoices() {
+    const list = $("#voice-list");
+    list.replaceChildren();
+    const v0 = VOICES.find(v => v.id === chosenVoice) || VOICES[0];
+    $("#voice-cur").textContent = v0.name;
+    VOICES.forEach((v) => {
+      const li = el("li");
+      const pb = el("button", "vplay"); pb.type = "button"; pb.id = "vplay-" + v.id; pb.innerHTML = PLAY_S;
+      pb.dataset.label = "Play " + v.name + " sample"; pb.setAttribute("aria-label", pb.dataset.label); pb.setAttribute("aria-pressed", "false");
+      pb.addEventListener("click", () => {
+        const was = sampleBtn === pb;
+        stopSample();
+        if (was) return;
+        if (currentAudio && !currentAudio.paused) currentAudio.pause();
+        sample = new Audio("voices/" + v.id + ".mp3");
+        sampleBtn = pb; pb.innerHTML = STOP_S; pb.setAttribute("aria-pressed", "true"); pb.setAttribute("aria-label", "Stop sample");
+        sample.addEventListener("ended", stopSample);
+        sample.play().catch(stopSample);
+      });
+      const txt = el("div");
+      txt.append(el("span", "vname", v.name), el("span", "vdesc", v.desc));
+      const use = el("button", "vuse", v.id === chosenVoice ? "Selected" : "Use this voice"); use.type = "button"; use.id = "vuse-" + v.id;
+      use.setAttribute("aria-pressed", v.id === chosenVoice ? "true" : "false");
+      use.hidden = !db && v.id !== chosenVoice;
+      use.addEventListener("click", async () => {
+        if (v.id === chosenVoice || !db) return;
+        use.disabled = true; use.textContent = "Saving…";
+        try {
+          await db.doc("control/voice").set({ voice: v.id, name: v.name, at: new Date().toISOString() });
+          chosenVoice = v.id;
+          $("#voice-note").textContent = v.name + " is set. The next brief uses it. To re-record a past brief in this voice, open it and tap Fix this brief, then type \"new voice\".";
+        } catch (e) {
+          $("#voice-note").textContent = "Couldn't save your pick. Try again.";
+        }
+        renderVoices();
+      });
+      li.append(pb, txt, use);
+      list.append(li);
+    });
+  }
+  renderVoices();
+  (async () => {
+    for (let i = 0; i < 20 && !db; i++) await new Promise(r => setTimeout(r, 250));
+    if (!db) return;
+    try { const d = await db.doc("control/voice").get(); if (d.exists && d.data().voice) chosenVoice = d.data().voice; } catch (e) {}
+    renderVoices();
   })();
 
   function renderLog() {
