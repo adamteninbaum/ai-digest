@@ -26,8 +26,11 @@ do not make a new brief, and do not change any other brief.
     `"audio_note"` with the new reason.
   - Links: if he names a bad link, re-resolve it with `resolve_links.py` or find the
     correct direct URL with WebSearch.
-  - Voice: if he mentions the voice ("new voice", "re-record"), re-render the audio
-    with step 7 so it uses his current pick, even if the brief already has audio.
+  - Voice: ALWAYS read his current pick (step 7's ArtifactData read). Re-render the
+    audio with step 7 if the brief's `audio.voice` is missing or differs from the pick
+    (for a pick of `edge_andrew`, `am_michael` counts as a match only if Edge still
+    fails), or if he mentions the voice ("new voice", "re-record"). Set `voice` and a
+    fresh `audio_rev` in digest.json either way you re-render.
   - Anything else he describes (wrong fact, item to drop, garbled wording): edit
     digest.json accordingly. If an item's spoken text changes, the audio must be
     re-rendered too.
@@ -169,6 +172,10 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   every spoken word, which the page uses to highlight words as they are read.
 - Do NOT upload to Dropbox. Adam no longer wants Dropbox copies; the MP3 lives only on
   the digest page (step 8).
+- tts.py prints `voice_used: <id>` (the voice actually spoken, e.g. `am_michael` when
+  Andrew fell back). Put it in digest.json as `"voice": "<id>"`, and set `"audio_rev"`
+  to the current UTC time (e.g. `"2026-10-13T03:01:00Z"`) so phones fetch the new file
+  instead of a cached one.
 - If TTS fails entirely, see step 8 (`audio_note`).
 
 ## 8. Publish to the digest page (this replaces email)

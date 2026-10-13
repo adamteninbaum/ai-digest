@@ -139,10 +139,14 @@ def write_site(d, out, dropbox="", existing="", words_path=""):
     brief = {k: d[k] for k in ("date", "intro", "items", "outro", "footer", "headline") if k in d}
     brief["id"] = bid
     brief["audio"] = {"src": f"audio/AI-Audio-Digest-{bid}.mp3"}
+    if d.get("voice"):
+        brief["audio"]["voice"] = d["voice"]
     if dropbox:
         brief["audio"]["dropbox"] = dropbox
     if d.get("audio_note"):
         brief["audio"] = {"note": d["audio_note"]}
+    elif d.get("audio_rev"):
+        brief["audio"]["rev"] = d["audio_rev"]
     elif words_path and os.path.exists(words_path):
         with open(words_path, encoding="utf-8") as fh:
             words = json.load(fh)

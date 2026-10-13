@@ -145,12 +145,14 @@ def main(src, out, voice):
         try:
             edge(text, out, edge_voice)
             print(f"engine: edge {edge_voice}")
+            print("voice_used: edge_andrew")
             return
         except Exception as e:  # noqa: BLE001
             print(f"{e}; falling back to Kokoro", file=sys.stderr)
     kv = KOKORO_VOICE if edge_voice else voice
     kokoro(text, out, kv)
     print(f"engine: kokoro {kv}")
+    print(f"voice_used: {kv}")
 
 
 if __name__ == "__main__":

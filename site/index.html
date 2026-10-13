@@ -293,7 +293,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     } else {
       const audio = new Audio();
       audio.preload = "metadata";
-      audio.src = src;
+      const rev = b.audio.rev || (index.find(e => idOf(e) === idOf(b)) || {}).repaired_at || "";
+      audio.src = rev ? src + "?v=" + encodeURIComponent(rev) : src;
       currentAudio = audio;
       const row = el("div", "player-row");
       const btn = el("button", "play");
@@ -379,6 +380,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         });
         speeds.append(fb);
       }
+      const vv = VOICES.find(v => v.id === b.audio.voice);
+      if (vv) foot.append(el("span", "src", "Voice: " + vv.name));
       if (b.audio.dropbox) {
         const dl = el("a", "dropbox", "Open MP3 in Dropbox");
         dl.href = b.audio.dropbox; dl.target = "_blank"; dl.rel = "noopener";
@@ -476,7 +479,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     return fig;
   }
 
+  let currentBrief = null;
   function renderBrief(b) {
+    currentBrief = b;
     const main = $("#brief");
     main.replaceChildren();
     const frag = el("div");
@@ -586,6 +591,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     const broken = !(b.audio && b.audio.src);
     const open = el("button", null, broken ? "Fix this brief (audio missing)" : "Fix this brief");
     open.type = "button";
+    open.id = "fix-open";
+    open.dataset.broken = broken ? "1" : "";
+    open.dataset.voice = (b.audio && b.audio.voice) || "";
     const msg = el("span", "fix-msg");
     open.addEventListener("click", () => {
       open.hidden = true;
@@ -602,6 +610,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       input.focus();
     });
     box.append(open, msg);
+    labelFix(open);
     return box;
   }
 
@@ -610,7 +619,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     btn.disabled = true; say("Starting the fix…");
     const now = new Date();
     const before = (index.find(e => idOf(e) === bid) || {}).repaired_at || "";
-    const what = [broken ? "the audio is missing (regenerate it)" : "", note].filter(Boolean).join("; ") || "re-check everything (audio, links, media) and fix whatever is broken";
+    const b0 = currentBrief && idOf(currentBrief) === bid ? currentBrief : null;
+    const vWant = VOICES.find(v => v.id === chosenVoice);
+    const voiceOff = b0 && !broken && (b0.audio || {}).voice !== chosenVoice;
+    const what = [broken ? "the audio is missing (regenerate it)" : "",
+      voiceOff && vWant ? "re-record the audio in Adam's chosen voice, " + vWant.name + " (" + chosenVoice + ")" : "",
+      note].filter(Boolean).join("; ") || "re-check everything (audio, links, media) and fix whatever is broken";
     try {
       await mcp.callTool("Claude Code Remote", "fire_trigger", {
         trigger_id: TRIGGER_ID,
@@ -704,7 +718,14 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     if (sample) { sample.pause(); sample = null; }
     if (sampleBtn) { sampleBtn.innerHTML = PLAY_S; sampleBtn.setAttribute("aria-pressed", "false"); sampleBtn.setAttribute("aria-label", sampleBtn.dataset.label); sampleBtn = null; }
   }
+  function labelFix(btn) {
+    btn = btn || document.getElementById("fix-open");
+    if (!btn || btn.dataset.broken) return;
+    const want = VOICES.find(v => v.id === chosenVoice);
+    btn.textContent = btn.dataset.voice !== chosenVoice && want ? "Fix this brief (re-record in " + want.name + ")" : "Fix this brief";
+  }
   function renderVoices() {
+    labelFix();
     const list = $("#voice-list");
     list.replaceChildren();
     const v0 = VOICES.find(v => v.id === chosenVoice) || VOICES[0];
@@ -734,7 +755,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         try {
           await db.doc("control/voice").set({ voice: v.id, name: v.name, at: new Date().toISOString() });
           chosenVoice = v.id;
-          $("#voice-note").textContent = v.name + " is set. The next brief uses it. To re-record a past brief in this voice, open it and tap Fix this brief, then type \"new voice\".";
+          $("#voice-note").textContent = v.name + " is set. The next brief uses it. To hear it on the brief above now, tap Fix this brief there.";
         } catch (e) {
           $("#voice-note").textContent = "Couldn't save your pick. Try again.";
         }
