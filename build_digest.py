@@ -143,10 +143,10 @@ def write_site(d, out, dropbox="", existing="", words_path=""):
         brief["audio"]["voice"] = d["voice"]
     if dropbox:
         brief["audio"]["dropbox"] = dropbox
+    if d.get("audio_rev") and not d.get("audio_note"):
+        brief["audio"]["rev"] = d["audio_rev"]
     if d.get("audio_note"):
         brief["audio"] = {"note": d["audio_note"]}
-    elif d.get("audio_rev"):
-        brief["audio"]["rev"] = d["audio_rev"]
     elif words_path and os.path.exists(words_path):
         with open(words_path, encoding="utf-8") as fh:
             words = json.load(fh)
