@@ -10,6 +10,31 @@ Adam is in US Eastern time: write every date and time that he will read (footer,
 summary) in Eastern (ET), never UTC. `published_at` in index.json stays UTC (machine field).
 Recipient: adamshawn0102@gmail.com. Subject format: `AI Audio Digest - YYYY-MM-DD`.
 
+## 0. Repair mode ("Fix this brief")
+If the Routine's run text starts with "REPAIR MODE", Adam tapped "Fix this brief" on the
+page. Do ONLY this section, then stop. Do not fetch newsletters, do not run discovery,
+do not make a new brief, and do not change any other brief.
+- Get the brief id and "What to fix" from the run text.
+- `pip install -q -r requirements.txt`. `Artifact` action `read` on the page (required
+  before republishing), then read `briefs/index.json` and `briefs/<id>.json` with `path`.
+- Rebuild `digest.json` from that brief JSON: keep `id`, `date`, `headline`, `intro`,
+  `items` (with their `urls`, `source`, `media`, `wildcard`), `outro`, `footer`. Drop
+  `audio` and `timing` (they are regenerated).
+- Fix what Adam asked for. Always also check these, whatever he wrote:
+  - Audio: if the brief has no `audio.src`, run step 7 (`tts.py` falls back to the local
+    Kokoro voice automatically if Edge TTS refuses). Only if both engines fail, keep
+    `"audio_note"` with the new reason.
+  - Links: if he names a bad link, re-resolve it with `resolve_links.py` or find the
+    correct direct URL with WebSearch.
+  - Anything else he describes (wrong fact, item to drop, garbled wording): edit
+    digest.json accordingly. If an item's spoken text changes, the audio must be
+    re-rendered too.
+- Publish exactly as in step 8 with the SAME id (`build_digest.py site` keeps the
+  original `published_at` and adds `repaired_at`, so the next scheduled window is
+  unaffected). Include the MP3 and any changed `media/...` files.
+- No ntfy alert and no PushNotification for a repair. Finish with one line: "Brief <id>
+  fixed: <what changed>" (or what could not be fixed and why).
+
 ## 1. Work out the window (state lives on the digest page, no state files)
 The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private claude.ai Artifact Adam owns).
 - `Artifact` action `read` with `url` = the page (required before you can republish it).
@@ -132,8 +157,9 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 
 ## 7. Audio
 - `python3 build_digest.py script digest.json` (writes script.txt), then
-  `python3 tts.py script.txt AI-Audio-Digest-<id>.mp3` (Edge TTS; handles the cloud
-  proxy's CA bundle). It also writes `AI-Audio-Digest-<id>.words.json`, the timing of
+  `python3 tts.py script.txt AI-Audio-Digest-<id>.mp3` (Edge TTS, retried 3 times; if
+  Microsoft refuses it falls back to the local Kokoro voice automatically and prints
+  `engine: kokoro`. Say which engine was used in the step 9 summary). It also writes `AI-Audio-Digest-<id>.words.json`, the timing of
   every spoken word, which the page uses to highlight words as they are read.
 - Do NOT upload to Dropbox. Adam no longer wants Dropbox copies; the MP3 lives only on
   the digest page (step 8).

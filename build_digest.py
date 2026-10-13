@@ -149,10 +149,17 @@ def write_site(d, out, dropbox="", existing="", words_path=""):
         paragraphs = [d.get("intro", "")] + [i["text"] for i in d["items"]] + [d.get("outro", "")]
         brief["timing"] = align(paragraphs, words)
     summary = d.get("headline") or (d["items"][0]["text"] if d["items"] else "")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    prior = next((e for e in index if (e.get("id") or e["date"]) == bid), None)
     index = [e for e in index if (e.get("id") or e["date"]) != bid]
-    index.append({"id": bid, "date": date, "items": len(d["items"]), "summary": " ".join(summary.split())[:160],
-                  "published_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                  "test": bool(d.get("test"))})
+    entry = {"id": bid, "date": date, "items": len(d["items"]), "summary": " ".join(summary.split())[:160],
+             "published_at": now, "test": bool(d.get("test"))}
+    if prior and prior.get("published_at"):
+        # A repair re-publishes an existing brief: keep its original publish time so the
+        # next scheduled run's window (which starts at the newest published_at) is unchanged.
+        entry["published_at"] = prior["published_at"]
+        entry["repaired_at"] = now
+    index.append(entry)
     index.sort(key=lambda e: (e["date"], e.get("published_at", "")), reverse=True)
     os.makedirs(os.path.join(out, "briefs"), exist_ok=True)
     with open(os.path.join(out, "briefs", f"{bid}.json"), "w", encoding="utf-8") as fh:

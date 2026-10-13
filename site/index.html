@@ -103,6 +103,13 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .gen button:disabled { opacity: 0.6; cursor: progress; }
 .gen .gen-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-align: right; max-width: 22rem; }
 .gen .gen-msg.err { color: var(--wild); }
+.fix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.fix button { font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text, inherit); cursor: pointer; }
+.fix button.go { border-color: var(--accent); background: var(--accent); color: var(--surface); }
+.fix button:disabled { opacity: 0.6; cursor: progress; }
+.fix input { flex: 1 1 14rem; min-width: 0; font: inherit; font-size: 0.85rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; }
+.fix .fix-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); flex-basis: 100%; }
+.fix .fix-msg.err { color: var(--wild); }
 .newer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; background: var(--accent-soft); border-radius: 10px; padding: 10px 14px; font-family: var(--font-mono); font-size: 0.8rem; }
 .newer button { font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 12px; border-radius: 999px; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; }
 .src { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
@@ -463,6 +470,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     stats.append(el("span", null, words(b) + " words"));
     const rt = el("span", null, "~" + Math.max(1, Math.round(words(b) / 160)) + " min listen"); rt.id = "runtime"; stats.append(rt);
     head.append(stats);
+    head.append(renderFix(b));
 
     const tr = el("section", "transcript");
     tr.append(el("h3", null, "Transcript"));
@@ -546,6 +554,70 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     }, 30000);
   }
 
+  // Fix this brief: re-runs the Routine in repair mode for the brief on screen (same id).
+  let fixWatch = 0;
+  function renderFix(b) {
+    const box = el("div", "fix");
+    box.hidden = !mcp;
+    box.dataset.fix = "1";
+    const bid = idOf(b);
+    const broken = !(b.audio && b.audio.src);
+    const open = el("button", null, broken ? "Fix this brief (audio missing)" : "Fix this brief");
+    open.type = "button";
+    const msg = el("span", "fix-msg");
+    open.addEventListener("click", () => {
+      open.hidden = true;
+      const input = el("input");
+      input.type = "text";
+      input.placeholder = broken ? "Optional: anything else wrong?" : "What's wrong? e.g. bad link in item 3";
+      input.setAttribute("aria-label", "What should be fixed");
+      const go = el("button", "go", "Start fix"); go.type = "button";
+      const cancel = el("button", null, "Cancel"); cancel.type = "button";
+      cancel.addEventListener("click", () => { input.remove(); go.remove(); cancel.remove(); open.hidden = false; msg.textContent = ""; });
+      go.addEventListener("click", () => requestFix(bid, input.value.trim(), broken, go, msg));
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") go.click(); });
+      box.insertBefore(cancel, msg); box.insertBefore(go, cancel); box.insertBefore(input, go);
+      input.focus();
+    });
+    box.append(open, msg);
+    return box;
+  }
+
+  async function requestFix(bid, note, broken, btn, msg) {
+    const say = (t, err) => { msg.textContent = t; msg.classList.toggle("err", !!err); };
+    btn.disabled = true; say("Starting the fix…");
+    const now = new Date();
+    const before = (index.find(e => idOf(e) === bid) || {}).repaired_at || "";
+    const what = [broken ? "the audio is missing (regenerate it)" : "", note].filter(Boolean).join("; ") || "re-check everything (audio, links, media) and fix whatever is broken";
+    try {
+      await mcp.callTool("Claude Code Remote", "fire_trigger", {
+        trigger_id: TRIGGER_ID,
+        text: "REPAIR MODE. Adam tapped 'Fix this brief' on the digest page at " + etTime(now) + ". Brief id: " + bid + ". What to fix: " + what + ". Follow the 'Repair mode' section of RUNBOOK.md: do NOT fetch newsletters or make a new brief; fix brief " + bid + " in place, keeping its id, then republish."
+      });
+      say("Fix started at " + etTime(now) + ". This brief updates here in about 3 to 6 minutes.");
+      clearInterval(fixWatch);
+      const started = Date.now();
+      fixWatch = setInterval(async () => {
+        if (Date.now() - started > 20 * 60 * 1000) { clearInterval(fixWatch); say("Still working or it stalled. Reload in a few minutes."); btn.disabled = false; return; }
+        try {
+          const fresh = await getJSON("briefs/index.json");
+          const e = fresh.find(x => idOf(x) === bid);
+          if (e && e.repaired_at && e.repaired_at !== before) {
+            clearInterval(fixWatch);
+            index = fresh.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
+            renderLog(); show(bid, false);
+          }
+        } catch (e) {}
+      }, 30000);
+    } catch (e) {
+      btn.disabled = false;
+      const code = e && e.code;
+      if (code === "not_in_manifest" || code === "not_granted" || code === "consent_required") say("The page needs your permission to start runs. Tap again and choose Allow.", true);
+      else if (code === "server_not_connected" || code === "selection_required" || code === "needs_reauth") say("Reconnect Claude Code Remote in claude.ai Settings, Connectors.", true);
+      else say("Couldn't start the fix (" + (code || "error") + "): " + ((e && e.message) || ""), true);
+    }
+  }
+
   async function requestBrief() {
     const btn = $("#gen-btn");
     btn.disabled = true;
@@ -585,6 +657,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     $("#gen").hidden = false;
     $("#sched").hidden = true;
     $("#gen-btn").addEventListener("click", requestBrief);
+    document.querySelectorAll("[data-fix]").forEach(n => { n.hidden = false; });
   })();
 
   function renderLog() {
