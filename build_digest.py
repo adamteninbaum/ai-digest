@@ -37,8 +37,16 @@ def load(path):
         return json.load(fh)
 
 
+NUMBERS = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+           "Eleven", "Twelve"]
+
+
 def spoken(d):
-    return [d["intro"], *(i["text"] for i in d["items"]), d["outro"]]
+    """The audio script. Each item is read with its number first ("One, Atomic Machines...")
+    to match the 01, 02 labels on the page; the page transcript itself is unchanged."""
+    items = [(NUMBERS[n] + ", " if n < len(NUMBERS) else "") + i["text"].strip()
+             for n, i in enumerate(d["items"])]
+    return [d["intro"], *items, d["outro"]]
 
 
 def write_script(d):
@@ -103,18 +111,26 @@ def _norm(t):
     return "".join(ch for ch in t.lower() if ch.isalnum())
 
 
+_NUMS = {n.lower() for n in NUMBERS}
+
+
 def align(paragraphs, words):
     """Map TTS word timings onto transcript tokens.
 
     Tokens are each paragraph split on whitespace, the same split the page does in JS
-    (text.trim().split(/\s+/)). Returns [[paragraph, token, start_ms, end_ms], ...].
+    (text.trim().split(/\\s+/)). Returns [[paragraph, token, start_ms, end_ms], ...].
     """
     tokens = [(p, t, _norm(tok)) for p, text in enumerate(paragraphs)
               for t, tok in enumerate(text.split())]
-    out, i = [], 0
+    out, i, num_start = [], 0, None
     for w in words:
         wn = _norm(w["text"])
         if not wn:
+            continue
+        # Spoken item numbers ("One,") are not in the transcript: skip one when we are at
+        # the start of a paragraph and the paragraph doesn't itself start with that word.
+        if (i < len(tokens) and tokens[i][1] == 0 and wn in _NUMS and tokens[i][2] != wn):
+            num_start = w["start"]  # the paragraph's first word inherits this start time
             continue
         window = range(i, min(i + 8, len(tokens)))
         hit = next((j for j in window if tokens[j][2] == wn), None)
@@ -126,7 +142,9 @@ def align(paragraphs, words):
         if out and out[-1][0] == p and out[-1][1] == t:
             out[-1][3] = w["end"]  # several spoken words inside one token ("5.5", "$1B")
         else:
-            out.append([p, t, w["start"], w["end"]])
+            start = num_start if (num_start is not None and t == 0) else w["start"]
+            out.append([p, t, start, w["end"]])
+        num_start = None
         # stay on a token until its last spoken part ("twelve" "million" "view")
         i = hit + 1 if tokens[hit][2].endswith(wn) or wn.endswith(tokens[hit][2]) else hit
     return out

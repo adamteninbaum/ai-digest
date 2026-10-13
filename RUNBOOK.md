@@ -121,6 +121,8 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
 - Use the resolved URLs everywhere below, and when checking against already-sent links.
 
 ## 6. Write the digest file (single source for the audio AND the page)
+- Do not number items in their text. `build_digest.py script` adds the spoken number
+  ("One, ...", "Two, ...") to the audio automatically; the page shows 01, 02.
 Write `digest.json` in the format documented at the top of `build_digest.py`:
 - `intro`: one short spoken opening line.
 - `items`: one entry per pick, in buzz order. `text` is exactly what will be spoken for
