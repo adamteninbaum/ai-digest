@@ -368,10 +368,21 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       });
       const foot = el("div", "player-foot");
       const speeds = el("div", "speeds");
+      // Remember the last speed on this device (browser storage; falls back to 1x if unavailable).
+      let rate = 1;
+      try { const v = parseFloat(localStorage.getItem("digest.speed")); if ([1, 1.25, 1.5].includes(v)) rate = v; } catch (e) {}
+      const applyRate = () => { audio.playbackRate = rate; audio.defaultPlaybackRate = rate; };
+      applyRate();
+      audio.addEventListener("loadedmetadata", applyRate);
+      audio.addEventListener("play", () => { if (audio.playbackRate !== rate) applyRate(); });
       [1, 1.25, 1.5].forEach((s) => {
         const sb = el("button", null, s + "x"); sb.type = "button"; sb.id = "speed-" + String(s).replace(".", "-");
-        sb.setAttribute("aria-pressed", s === 1 ? "true" : "false");
-        sb.addEventListener("click", () => { audio.playbackRate = s; speeds.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === sb ? "true" : "false")); });
+        sb.setAttribute("aria-pressed", s === rate ? "true" : "false");
+        sb.addEventListener("click", () => {
+          rate = s; applyRate();
+          try { localStorage.setItem("digest.speed", String(s)); } catch (e) {}
+          speeds.querySelectorAll("button[id^='speed-']").forEach(x => x.setAttribute("aria-pressed", x === sb ? "true" : "false"));
+        });
         speeds.append(sb);
       });
       foot.append(speeds);
