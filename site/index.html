@@ -50,6 +50,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .player { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+/* The player stays pinned to the top of the screen while the transcript scrolls under it. */
+.player { position: sticky; top: max(8px, env(safe-area-inset-top, 0px)); z-index: 20; transition: box-shadow 0.15s; }
+.player.stuck { box-shadow: 0 -12px 0 var(--bg), 0 6px 20px rgba(0, 0, 0, 0.18); }
+.player-sentinel { height: 1px; margin-bottom: -1px; }
 .player-row { display: flex; align-items: center; gap: 14px; }
 .play { flex: none; width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--accent); color: var(--surface); cursor: pointer; display: grid; place-items: center; }
 .play svg { width: 20px; height: 20px; fill: currentColor; }
@@ -425,7 +429,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
           const s1 = on.closest(".seg"); if (s1) s1.classList.add("live");
           if (followText && !audio.paused) {
             const r = on.getBoundingClientRect();
-            if (r.top < 90 || r.bottom > window.innerHeight - 90) on.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+            const pl = document.querySelector(".player");
+            const topEdge = (pl ? pl.getBoundingClientRect().bottom : 0) + 24;
+            if (r.top < topEdge || r.bottom > window.innerHeight - 90) {
+              const mid = topEdge + (window.innerHeight - topEdge) / 2;
+              window.scrollTo({ top: window.scrollY + r.top - mid, behavior: reduce ? "auto" : "smooth" });
+            }
           }
         }
       }
@@ -548,7 +557,13 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 
     stopSync();
     currentAudio = null;
-    frag.append(head, renderPlayer(b), tr);
+    const sentinel = el("div", "player-sentinel");
+    const playerBox = renderPlayer(b);
+    head.append(sentinel);
+    frag.append(head, playerBox, tr);
+    if ("IntersectionObserver" in window) {
+      new IntersectionObserver(([e]) => playerBox.classList.toggle("stuck", !e.isIntersecting && e.boundingClientRect.top < 0)).observe(sentinel);
+    }
     if (b.footer) frag.append(el("p", "footer-note", b.footer));
     main.append(frag);
     wireSync(b, tr);
