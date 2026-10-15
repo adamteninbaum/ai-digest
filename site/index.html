@@ -288,6 +288,24 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     return r.json();
   }
 
+  const SPEEDS = [1, 1.25, 1.5];
+  let speedRate = 1;
+  try { const v = parseFloat(localStorage.getItem("digest.speed")); if (SPEEDS.includes(v)) speedRate = v; } catch (e) {}
+  function setSpeed(s, save) {
+    if (!SPEEDS.includes(s)) return;
+    speedRate = s;
+    if (currentAudio) { currentAudio.playbackRate = s; currentAudio.defaultPlaybackRate = s; }
+    document.querySelectorAll("button[id^='speed-']").forEach(x => x.setAttribute("aria-pressed", x.id === "speed-" + String(s).replace(".", "-") ? "true" : "false"));
+    if (!save) return;
+    try { localStorage.setItem("digest.speed", String(s)); } catch (e) {}
+    if (db) db.doc("control/playback").set({ speed: s, at: new Date().toISOString() }).catch(() => {});
+  }
+  (async () => {
+    for (let i = 0; i < 20 && !db; i++) await new Promise(r => setTimeout(r, 250));
+    if (!db) return;
+    try { const d = await db.doc("control/playback").get(); if (d.exists) setSpeed(parseFloat(d.data().speed), false); } catch (e) {}
+  })();
+
   function renderPlayer(b) {
     const box = el("section", "player");
     box.setAttribute("aria-label", "Audio");
@@ -368,21 +386,16 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       });
       const foot = el("div", "player-foot");
       const speeds = el("div", "speeds");
-      // Remember the last speed on this device (browser storage; falls back to 1x if unavailable).
-      let rate = 1;
-      try { const v = parseFloat(localStorage.getItem("digest.speed")); if ([1, 1.25, 1.5].includes(v)) rate = v; } catch (e) {}
-      const applyRate = () => { audio.playbackRate = rate; audio.defaultPlaybackRate = rate; };
+      // Last-used speed: kept in the page's saved data (control/playback) so it survives closing
+      // the app, with browser storage as a quick first guess before that loads.
+      const applyRate = () => { audio.playbackRate = speedRate; audio.defaultPlaybackRate = speedRate; };
       applyRate();
       audio.addEventListener("loadedmetadata", applyRate);
-      audio.addEventListener("play", () => { if (audio.playbackRate !== rate) applyRate(); });
+      audio.addEventListener("play", () => { if (audio.playbackRate !== speedRate) applyRate(); });
       [1, 1.25, 1.5].forEach((s) => {
         const sb = el("button", null, s + "x"); sb.type = "button"; sb.id = "speed-" + String(s).replace(".", "-");
-        sb.setAttribute("aria-pressed", s === rate ? "true" : "false");
-        sb.addEventListener("click", () => {
-          rate = s; applyRate();
-          try { localStorage.setItem("digest.speed", String(s)); } catch (e) {}
-          speeds.querySelectorAll("button[id^='speed-']").forEach(x => x.setAttribute("aria-pressed", x === sb ? "true" : "false"));
-        });
+        sb.setAttribute("aria-pressed", s === speedRate ? "true" : "false");
+        sb.addEventListener("click", () => setSpeed(s, true));
         speeds.append(sb);
       });
       foot.append(speeds);
