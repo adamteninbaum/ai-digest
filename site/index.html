@@ -88,7 +88,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .link-label { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .vote { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .vote button.flag[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.views { display: flex; gap: 8px; margin-top: -20px; }
+.views { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -20px; }
+.views button[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.interests { margin-top: -20px; }
+.interests[hidden], .views[hidden] { display: none; }
 .views button { font-family: var(--font-mono); font-size: 0.75rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
 .views button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .flag-card { display: flex; flex-direction: column; gap: 8px; padding-block: 16px; border-top: 1px solid var(--line); }
@@ -198,16 +201,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   <nav class="views" id="views" hidden aria-label="Views">
     <button type="button" id="view-briefs" aria-pressed="true">Briefs</button>
     <button type="button" id="view-flagged" aria-pressed="false">Flagged <span id="flag-count"></span></button>
+    <button type="button" id="view-topics" aria-expanded="false" aria-controls="interests">More of this <span id="topic-count"></span></button>
   </nav>
-
-  <div class="newer" id="newer" hidden>
-    <span>A newer brief is ready.</span>
-    <button type="button" id="newer-btn">Open it</button>
-  </div>
-
-  <main id="brief" aria-live="polite">
-    <div class="empty" id="loading">Loading the latest brief. Each run adds a new one here with its audio, the full transcript and the direct links.</div>
-  </main>
 
   <section class="interests" id="interests" hidden aria-labelledby="interests-h">
     <h3 id="interests-h">More of this</h3>
@@ -219,6 +214,16 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     <ul class="interest-list" id="interest-list"></ul>
     <p id="interest-msg" role="status"></p>
   </section>
+
+
+  <div class="newer" id="newer" hidden>
+    <span>A newer brief is ready.</span>
+    <button type="button" id="newer-btn">Open it</button>
+  </div>
+
+  <main id="brief" aria-live="polite">
+    <div class="empty" id="loading">Loading the latest brief. Each run adds a new one here with its audio, the full transcript and the direct links.</div>
+  </main>
 
   <details class="voices" id="voices">
     <summary>Voice <span class="cur" id="voice-cur"></span></summary>
@@ -409,7 +414,6 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       refreshVotes();
     }, () => {});
     $("#views").hidden = false;
-    $("#interests").hidden = false;
     db.collection("interests").onSnapshot((snap) => {
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.at || "").localeCompare(b.at || ""));
       const list = $("#interest-list"); list.replaceChildren();
@@ -419,6 +423,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         x.addEventListener("click", async () => { x.disabled = true; try { await db.collection("interests").doc(it.id).delete(); } catch (e) { x.disabled = false; $("#interest-msg").textContent = "Couldn't remove it. Try again."; } });
         li.append(x); list.append(li);
       });
+      $("#topic-count").textContent = items.length ? "(" + items.length + ")" : "";
       if (!items.length) $("#interest-msg").textContent = "Nothing added yet.";
       else if ($("#interest-msg").textContent === "Nothing added yet.") $("#interest-msg").textContent = "";
     }, () => {});
@@ -1004,6 +1009,12 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     }
   }
 
+  $("#view-topics").addEventListener("click", () => {
+    const box = $("#interests"), btn = $("#view-topics");
+    box.hidden = !box.hidden;
+    btn.setAttribute("aria-expanded", box.hidden ? "false" : "true");
+    if (!box.hidden) $("#interest-input").focus();
+  });
   $("#view-flagged").addEventListener("click", () => { renderFlagged(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   $("#view-briefs").addEventListener("click", () => { if (index[0]) show(idOf(index[0]), true); });
 
