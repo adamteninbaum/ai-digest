@@ -126,6 +126,17 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .fix input { flex: 1 1 14rem; min-width: 0; font: inherit; font-size: 0.85rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: inherit; }
 .fix .fix-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); flex-basis: 100%; }
 .fix .fix-msg.err { color: var(--wild); }
+.interests { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.interests h3 { font-family: var(--font-display); font-size: 1.1rem; margin: 0; }
+.interests p { margin: 0; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.interest-form { display: flex; gap: 8px; }
+.interest-form input { flex: 1; min-width: 0; font: inherit; font-size: 0.95rem; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.interest-form button { font-family: var(--font-mono); font-size: 0.75rem; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); cursor: pointer; }
+.interest-form button:disabled { opacity: 0.6; cursor: progress; }
+.interest-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.interest-list li { display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--accent-soft); }
+.interest-list button { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; padding: 2px 6px; border-radius: 999px; }
+.interest-list button:hover { color: var(--ink); }
 .voices summary { cursor: pointer; font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; list-style: none; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .voices summary::-webkit-details-marker { display: none; }
 .voices summary .cur { font-family: var(--font-mono); font-weight: 400; font-size: 0.75rem; color: var(--muted); }
@@ -197,6 +208,17 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   <main id="brief" aria-live="polite">
     <div class="empty" id="loading">Loading the latest brief. Each run adds a new one here with its audio, the full transcript and the direct links.</div>
   </main>
+
+  <section class="interests" id="interests" hidden aria-labelledby="interests-h">
+    <h3 id="interests-h">More of this</h3>
+    <p>Topics you want more of. Each new brief favors matching stories and searches for them.</p>
+    <form class="interest-form" id="interest-form">
+      <input id="interest-input" type="text" maxlength="200" placeholder="e.g. Apple AI, Siri agents" aria-label="Topic to see more of" autocomplete="off">
+      <button type="submit" id="interest-add">Add</button>
+    </form>
+    <ul class="interest-list" id="interest-list"></ul>
+    <p id="interest-msg" role="status"></p>
+  </section>
 
   <details class="voices" id="voices">
     <summary>Voice <span class="cur" id="voice-cur"></span></summary>
@@ -387,6 +409,32 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       refreshVotes();
     }, () => {});
     $("#views").hidden = false;
+    $("#interests").hidden = false;
+    db.collection("interests").onSnapshot((snap) => {
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.at || "").localeCompare(b.at || ""));
+      const list = $("#interest-list"); list.replaceChildren();
+      items.forEach((it) => {
+        const li = el("li"); li.append(document.createTextNode(it.text));
+        const x = el("button", null, "×"); x.type = "button"; x.setAttribute("aria-label", "Remove " + it.text);
+        x.addEventListener("click", async () => { x.disabled = true; try { await db.collection("interests").doc(it.id).delete(); } catch (e) { x.disabled = false; $("#interest-msg").textContent = "Couldn't remove it. Try again."; } });
+        li.append(x); list.append(li);
+      });
+      if (!items.length) $("#interest-msg").textContent = "Nothing added yet.";
+      else if ($("#interest-msg").textContent === "Nothing added yet.") $("#interest-msg").textContent = "";
+    }, () => {});
+    $("#interest-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const input = $("#interest-input"), btn = $("#interest-add");
+      const text = input.value.trim().replace(/\s+/g, " ");
+      if (!text) return;
+      btn.disabled = true;
+      try {
+        await db.collection("interests").doc("i" + Date.now()).set({ text, at: new Date().toISOString() });
+        input.value = "";
+        $("#interest-msg").textContent = "Added. The next brief will look for it.";
+      } catch (e) { $("#interest-msg").textContent = "Couldn't save that. Try again."; }
+      btn.disabled = false;
+    });
     db.collection("flags").onSnapshot((snap) => {
       flags = new Map(snap.docs.map(d => [d.id, d.data()]));
       refreshFlags();

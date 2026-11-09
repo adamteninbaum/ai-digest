@@ -71,6 +71,11 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
   roundup when it is fresh. A source that fails is listed under `errors`; carry on.
 - Also run 2 or 3 `WebSearch` queries such as "AI news today", "new AI model release
   this week", "AI video OR 3D animation tool launch" to catch anything big the feeds miss.
+- Adam's topics: the page has a "More of this" box. Read it with `ArtifactData` action
+  `list`, `url` = the digest page, `collection` = `interests` (each doc has `text`, e.g.
+  "Apple AI, Siri agents", and `at`). For EACH topic run 1 `WebSearch` for news on it from
+  the window (e.g. "<topic> news this week") and scan the newsletters for it too. If the
+  read fails or the list is empty, skip this.
 - These are CANDIDATES, judged exactly like newsletter items in steps 3 and 4. A story
   that is both in the newsletters and hot online gets a buzz boost. Aim for at least 1 or
   2 items per brief that came from online discovery and were NOT in the newsletters, when
@@ -99,6 +104,10 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
   today's picks toward the liked patterns and away from the disliked ones. Newer votes
   count more than older ones. Keep 2 or 3 wildcards regardless, but shape them by the
   wildcard votes. Never repeat an item he already voted on.
+- Adam's topics (step 2b): any real, recent story matching one of his topics gets a
+  strong boost; include the best match whenever one exists, even if the newsletters
+  missed it. Don't force a stale or weak match in. Note matches in the footer (e.g.
+  "Topics matched: Apple AI").
 - If the feedback read fails, carry on without it and say so in the footer. Mention in
   the footer how many votes informed the picks (e.g. "Shaped by 12 votes: 9 up, 3 down").
 - `preferences.md` in the repo holds any standing preferences; read it too.
