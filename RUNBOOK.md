@@ -309,7 +309,9 @@ Adam wants a "Share with friends & family" button on every saved article. Each o
 public Dropbox folder `/Claude/news-capture/shared/<date> <title>/` with the article as a PDF
 (text plus lead image) and its full audio; the page shows the button when an item has
 `full.share`.
-- `python3 share.py out/briefs/<id>.json` (after 8b, so the full audio exists; run it even if
+- `python3 -m pip install -q reportlab && python3 -m pip install -q --ignore-installed Pillow`
+  (an old system Pillow can break the PDF step), then
+  `python3 share.py out/briefs/<id>.json` (after 8b, so the full audio exists; run it even if
   8b failed: the PDF still gets made). It skips items that already have a link, prints one line
   per article and `shared N`.
 - Then publish once more exactly as in step 8b (`briefs/<id>.json` only is enough). No alerts.
