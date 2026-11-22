@@ -2,3 +2,10 @@ __pycache__/
 saved/
 audio_full/
 out/
+# Per-run outputs
+AI-Audio-Digest-*.mp3
+AI-Audio-Digest-*.words.json
+digest.json
+script.txt
+email.html
+email.txt
