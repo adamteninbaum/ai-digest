@@ -56,9 +56,10 @@ discovery or WebSearch, do not read votes or topics, and do not change other bri
   here are the articles you saved.", the saved items only, a short `outro`, `headline` naming
   them, `footer` "Saved articles only. Newsletters come in the next daily brief." Get `id`
   with `nextid` as usual. No media (skip step 6b).
-- Steps 7, 7b and 8 as usual (brief audio, full-article audio, publish with every file, both
-  alerts; for notify.py use the article titles as the summary). Then set the same
-  `control/saved_now` doc to `{"status": "done", "id": "<id>", "at": "<UTC now>"}`.
+- Steps 7 and 8 as usual (brief audio, publish, both alerts; for notify.py use the article
+  titles as the summary). Then set the same `control/saved_now` doc to `{"status": "done",
+  "id": "<id>", "at": "<UTC now>"}`. The brief is now on the page.
+- Then step 8b (full-article audio, added afterward with a second publish).
 - Finish with "Saved-only brief <id>: <n> articles" plus audio status and credits used.
 
 ## 1. Work out the window (state lives on the digest page, no state files)
@@ -126,7 +127,7 @@ EVERY new one becomes a story in this brief, on top of the 4 to 7 picks. Never u
     `/Claude/news-capture/articles` (recursive false), then `download_link` on every `.txt`
     entry, and run the same `fetch <USED> saved/links.json`. The script still skips used ones.
 - It writes `saved/new.json` and prints one line per new article. None new: skip the rest
-  of this step and of step 7b.
+  of this step and of step 8b.
 - Read each new article in `saved/new.json` (title, source, author, paragraphs). For each,
   add one item to digest.json AFTER the regular picks (they do not count toward the 4 to 7):
   `{"text": "<spoken blurb>", "title": "<Title>", "urls": [{"url": "<Link>", "label":
@@ -240,30 +241,6 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   instead of a cached one.
 - If TTS fails entirely, see step 8 (`audio_note`).
 
-## 7b. Full-article audio for saved articles (only if step 2c found new ones)
-- Full-article voice: `ArtifactData` action `get`, `url` = the page, `collection` =
-  `control`, `doc_id` = `article_voice`. Its `mode` is `default` (Adam's brief voice, free),
-  `elevenlabs` (ElevenLabs instead), `both` (both, to compare) or `sample` (brief voice for
-  the whole article plus a short ElevenLabs clip of the first minute, about 1,000 credits).
-  Pass the mode to render as is. Missing or failed read:
-  `default`.
-- `python3 saved.py render <VOICE_ID from step 7> <mode> <USED from step 2c>`. It renders
-  each new article's full text (the brief voice via tts.py, and/or ElevenLabs via
-  elevenlabs_tts.py), writes `out/briefs/full/<key>.json` with word timings, the MP3s under
-  `audio_full/`, and the merged `out/saved/used.json`. Its LAST stdout line is a JSON map of
-  Artifact `files` entries: add all of them to the step 8 publish. Run it BEFORE
-  `build_digest.py site` (which reads those files to add the button).
-- Kokoro is slow on this machine (about 7 minutes per 1,000 words), so render stops safely
-  after about 8 minutes and prints `PARTIAL ...` (exit code 4). Use a Bash timeout of
-  600000 ms and run the SAME command again until it prints the files map. Finished
-  paragraphs, versions and ElevenLabs audio are cached and never redone (no double credits).
-  Two long articles can take 30 minutes or more; that is expected.
-- ElevenLabs needs the network secret for `api.elevenlabs.io` (header `xi-api-key`) on the
-  cloud environment; the proxy adds the key. If it fails, the script records a note (and for
-  `elevenlabs` mode falls back to the brief voice); say so in the step 9 summary with the
-  credits used (`credits` in each version).
-- Even if audio fails, keep the items, publish `used.json`, and carry on.
-
 ## 8. Publish to the digest page (this replaces email)
 Adam does not want email: the Gmail connector wraps every link in a Google redirect page.
 - `python3 build_digest.py site digest.json out "" "<local path of the
@@ -273,9 +250,9 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   `url` = https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy, `file_path` = `site/index.html` from this repo, and `files` =
   `{"briefs/index.json": "out/briefs/index.json", "briefs/<id>.json": "out/briefs/<id>.json",
   "audio/AI-Audio-Digest-<id>.mp3": "<the MP3 path>"}` plus every `media/...` entry step 6b
-  printed and you kept, plus every entry step 7b printed (`briefs/full/...`,
-  `audio/full-...`, `saved/used.json`). `saved/used.json` is what stops an article being used
-  twice, so it must be in the same publish as the brief. Do not pass `icon`,
+  printed and you kept. If step 2c found new saved articles, first run `python3 saved.py
+  mark <USED from step 2c>` and add the `saved/used.json` entry it prints: it stops an article
+  being used twice, so it goes in the same publish as the brief. Do not pass `icon`,
   `capabilities` or `force`. Files you leave out (older briefs and audio) are kept.
 - If TTS failed, set `"audio_note": "Audio unavailable this run: <reason>"` in digest.json
   and leave the MP3 out of `files`.
@@ -296,6 +273,36 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   digest.json "https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy"` (the page, as the listen link) and send ONE email with Gmail `send_message` to
   adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
   `htmlBody` = email.html, `body` = email.txt, verbatim.
+
+Then do step 8b if step 2c found new saved articles.
+
+## 8b. Full-article audio for saved articles (AFTER step 8; only if step 2c found new ones)
+The brief is already published and the alerts sent. This adds the "Listen to the full article"
+button afterward, so the slow full-article audio never holds up the brief.
+- Full-article voice: `ArtifactData` action `get`, `url` = the page, `collection` =
+  `control`, `doc_id` = `article_voice`. Its `mode` is `default` (Adam's brief voice, free),
+  `elevenlabs` (ElevenLabs instead), `both` (both, to compare) or `sample` (brief voice for
+  the whole article plus a short ElevenLabs clip of the first minute, about 1,000 credits)
+  or `off` (no full-article audio: stop here). Pass the mode to render as is. Missing or
+  failed read: `default`.
+- `python3 saved.py render <VOICE_ID from step 7> <mode> <USED from step 2c>`. It renders
+  each new article's full text (the brief voice, and/or ElevenLabs via elevenlabs_tts.py),
+  writes `out/briefs/full/<key>.json` with word timings and the MP3s under `audio_full/`.
+  Its LAST stdout line is a JSON map of Artifact `files` entries.
+- Then add the button: `python3 build_digest.py site digest.json out "" out/briefs/index.json
+  AI-Audio-Digest-<id>.words.json` (the index step 8 wrote; this keeps the brief's
+  `published_at`), and publish again exactly as in step 8 with `files` = `briefs/index.json`,
+  `briefs/<id>.json` and every entry render printed. No alerts this time.
+- Kokoro is slow on this machine (about 7 minutes per 1,000 words), so render stops safely
+  after about 8 minutes and prints `PARTIAL ...` (exit code 4). Use a Bash timeout of
+  600000 ms and run the SAME command again until it prints the files map. Finished
+  paragraphs, versions and ElevenLabs audio are cached and never redone (no double credits).
+  Two long articles can take 30 minutes or more; that is expected.
+- ElevenLabs needs the network secret for `api.elevenlabs.io` (header `xi-api-key`) on the
+  cloud environment; the proxy adds the key. If it fails, the script records a note (and for
+  `elevenlabs` mode falls back to the brief voice); say so in the step 9 summary with the
+  credits used (`credits` in each version).
+- If the full-article audio fails, leave the brief as it is (it is already published).
 
 ## 9. Finish
 This summary is what Adam's phone alert shows, so its first line must be "AI digest

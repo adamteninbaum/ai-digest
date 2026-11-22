@@ -24,6 +24,9 @@ Usage:
   python3 saved.py parse FILE.txt [FILE.txt ...]
       Fallback when the API is not reachable: the Routine saves each article's text (fetched
       with the Dropbox connector) as a local .txt, and this builds saved/new.json from them.
+  python3 saved.py mark USED_JSON
+      Writes out/saved/used.json (USED_JSON plus every article in saved/new.json) and prints
+      its Artifact files entry. Publish it WITH the brief, so no article is used twice.
   python3 saved.py render VOICE_ID MODE [USED_JSON]
       Kokoro is slow here, so this stops safely after about 8 minutes (SAVED_BUDGET_S) and
       prints "PARTIAL ..." with exit code 4. Run the SAME command again until it prints the
@@ -395,21 +398,37 @@ def cmd_render(voice, mode, used_path=""):
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(doc, fh, ensure_ascii=False)
         files[f"briefs/full/{a['key']}.json"] = path
-    used = read_used(used_path)
-    for a in arts:
-        used.append({"key": a["key"], "file_id": a["file_id"], "content_hash": a["content_hash"],
-                     "link": a["link"], "title": a["title"], "name": a["name"]})
-    with open("out/saved/used.json", "w", encoding="utf-8") as fh:
-        json.dump(used, fh, ensure_ascii=False, indent=1)
-    files["saved/used.json"] = "out/saved/used.json"
+    files.update(write_used(arts, used_path))
     print(json.dumps(files))
 
 
+def write_used(arts, used_path):
+    """Merge these articles into used.json (once each, by key). Returns its files entry."""
+    used = read_used(used_path)
+    have = {u.get("key") for u in used}
+    for a in arts:
+        if a["key"] not in have:
+            used.append({"key": a["key"], "file_id": a["file_id"], "content_hash": a["content_hash"],
+                         "link": a["link"], "title": a["title"], "name": a["name"]})
+    os.makedirs("out/saved", exist_ok=True)
+    with open("out/saved/used.json", "w", encoding="utf-8") as fh:
+        json.dump(used, fh, ensure_ascii=False, indent=1)
+    return {"saved/used.json": "out/saved/used.json"}
+
+
+def cmd_mark(used_path):
+    with open(os.path.join(SAVED_DIR, "new.json"), encoding="utf-8") as fh:
+        arts = json.load(fh)
+    print(json.dumps(write_used(arts, used_path)))
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] not in ("fetch", "parse", "render"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("fetch", "parse", "render", "mark"):
         sys.exit(__doc__)
     if sys.argv[1] == "fetch":
         cmd_fetch(sys.argv[2] if len(sys.argv) > 2 else "", sys.argv[3] if len(sys.argv) > 3 else "")
+    elif sys.argv[1] == "mark":
+        cmd_mark(sys.argv[2] if len(sys.argv) > 2 else "")
     elif sys.argv[1] == "parse":
         cmd_parse(sys.argv[2:])
     else:
