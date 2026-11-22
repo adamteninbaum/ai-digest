@@ -303,9 +303,6 @@ button afterward, so the slow full-article audio never holds up the brief.
   `elevenlabs` mode falls back to the brief voice); say so in the step 9 summary with the
   credits used (`credits` in each version).
 - If the full-article audio fails, leave the brief as it is (it is already published).
-- No sharing links: Adam does not want "Share with friends & family" buttons or Dropbox share
-  folders on his page. Never add a `share` field to an item's `full`, never create share
-  folders for saved articles, and never add a share button to `site/index.html`.
 
 ## 9. Finish
 This summary is what Adam's phone alert shows, so its first line must be "AI digest

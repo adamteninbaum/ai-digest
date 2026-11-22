@@ -171,6 +171,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .full-btn svg { width: 14px; height: 14px; fill: currentColor; }
 .full-btn:disabled { opacity: 0.6; cursor: progress; }
 .full-meta { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.share-btn { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 0.75rem; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+.share-btn svg { width: 14px; height: 14px; fill: currentColor; }
 .back { align-self: flex-start; font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
 .vers { display: flex; flex-wrap: wrap; gap: 6px; }
 .vers button { font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; text-align: left; }
@@ -727,6 +730,24 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     const cost = v.engine === "elevenlabs" ? "about " + Number(v.credits || 0).toLocaleString() + " credits" + (v.credits_estimated ? " (est.)" : "") : "free";
     return name + " (" + (ENGINE_NAME[v.engine] || v.engine) + (v.sample ? ", first minute" : "") + ") · " + cost;
   }
+  // Friends-and-family link (share.py): a Dropbox folder with the article as a PDF (text and
+  // images) and its full audio. Uses the phone's share sheet, else copies, else shows the link.
+  function shareRow(url, title) {
+    const row = el("div", "share-row");
+    const b = el("button", "share-btn"); b.type = "button";
+    b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l4 4h-3v7h-2V7H8zM5 11h2v8h10v-8h2v10H5z"/></svg><span>Share with friends &amp; family</span>';
+    const msg = el("span", "full-meta");
+    const show = () => { msg.replaceChildren(document.createTextNode("Send this link: ")); const a = el("a", null, url); a.href = url; a.target = "_blank"; a.rel = "noopener"; a.style.overflowWrap = "anywhere"; msg.append(a); };
+    b.addEventListener("click", async () => {
+      const text = (title || "An article") + ": read it and listen to it here.";
+      try { if (navigator.share) { await navigator.share({ title: title || "Article", text, url }); msg.textContent = "Shared."; return; } } catch (e) { if (e && e.name === "AbortError") return; }
+      try { await navigator.clipboard.writeText(url); msg.textContent = "Link copied. Paste it into a text or email."; return; } catch (e) {}
+      show();
+    });
+    row.append(b, msg);
+    return row;
+  }
+
   async function renderArticle(brief, n, item, btn) {
     if (btn) { btn.disabled = true; btn.querySelector("span").textContent = "Loading the article…"; }
     let doc;
@@ -743,6 +764,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     [doc.source, doc.author ? "by " + doc.author : "", doc.date, (doc.words || 0).toLocaleString() + " words"].filter(Boolean).forEach(t => stats.append(el("span", null, t)));
     head.append(stats);
     if (doc.link) { const a = el("a", null, "Open the original (Apple News)"); a.href = doc.link; a.target = "_blank"; a.rel = "noopener"; a.className = "dropbox"; head.append(a); }
+    if (item.full && item.full.share) head.append(shareRow(item.full.share, doc.title || item.title));
     const versions = (doc.versions || []).filter(v => v.src);
     const notes = (doc.versions || []).filter(v => v.note);
     const holder = el("div"); holder.style.display = "contents";
@@ -816,6 +838,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         const vs = (item.full.versions || []).filter(v => !v.note);
         const mins = vs[0] && vs[0].seconds ? Math.max(1, Math.round(vs[0].seconds / 60)) + " min · " : "";
         body.append(el("span", "full-meta", mins + (item.full.words ? item.full.words.toLocaleString() + " words · " : "") + (vs.length ? vs.map(versionLabel).join(" / ") : "audio unavailable")));
+        if (item.full.share) body.append(shareRow(item.full.share, item.title));
       }
       const links = el("div", "links");
       (item.urls || []).forEach((u) => {
