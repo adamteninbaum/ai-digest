@@ -222,7 +222,9 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 ## 7b. Full-article audio for saved articles (only if step 2c found new ones)
 - Full-article voice: `ArtifactData` action `get`, `url` = the page, `collection` =
   `control`, `doc_id` = `article_voice`. Its `mode` is `default` (Adam's brief voice, free),
-  `elevenlabs` (ElevenLabs instead) or `both` (both, to compare). Missing or failed read:
+  `elevenlabs` (ElevenLabs instead), `both` (both, to compare) or `sample` (brief voice for
+  the whole article plus a short ElevenLabs clip of the first minute, about 1,000 credits).
+  Pass the mode to render as is. Missing or failed read:
   `default`.
 - `python3 saved.py render <VOICE_ID from step 7> <mode> <USED from step 2c>`. It renders
   each new article's full text (the brief voice via tts.py, and/or ElevenLabs via

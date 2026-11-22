@@ -28,7 +28,9 @@ Usage:
       Kokoro is slow here, so this stops safely after about 8 minutes (SAVED_BUDGET_S) and
       prints "PARTIAL ..." with exit code 4. Run the SAME command again until it prints the
       files map; finished paragraphs, versions and ElevenLabs audio are never redone.
-      MODE is "default" (Adam's brief voice, free), "elevenlabs" or "both". For every article
+      MODE is "default" (Adam's brief voice, free), "elevenlabs", "both", or "sample" (brief
+      voice for the whole article plus an ElevenLabs clip of the first paragraphs, about
+      SAMPLE_CHARS = 1,000 characters, roughly 1 minute and 1,000 credits). For every article
       in saved/new.json: renders the full article audio, writes out/briefs/full/<key>.json
       (paragraphs + word timings + voice + credits) and audio/full-<key>-<engine>.mp3, and a
       merged out/saved/used.json. Prints the Artifact "files" map as JSON (last stdout line).
@@ -304,9 +306,24 @@ def render_default(a, voice, out_mp3):
     return {"engine": "kokoro", "voice": kv, "credits": 0, "words": kokoro_resumable(paras, out_mp3, kv)}
 
 
-def render_eleven(a, out_mp3):
+SAMPLE_CHARS = int(os.environ.get("SAMPLE_CHARS", "1000"))
+
+
+def sample_count(paras):
+    """How many leading paragraphs make the ElevenLabs sample: whole paragraphs until about
+    SAMPLE_CHARS characters (always at least the title line and one paragraph)."""
+    n, total = 0, 0
+    for p in paras:
+        if n >= 2 and total + len(p) > SAMPLE_CHARS:
+            break
+        n, total = n + 1, total + len(p)
+    return n
+
+
+def render_eleven(a, out_mp3, sample=False):
     import elevenlabs_tts
-    return elevenlabs_tts.render(spoken_paragraphs(a), out_mp3)
+    paras = spoken_paragraphs(a)
+    return elevenlabs_tts.render(paras[:sample_count(paras)] if sample else paras, out_mp3)
 
 
 def cmd_render(voice, mode, used_path=""):
@@ -324,12 +341,14 @@ def cmd_render(voice, mode, used_path=""):
         doc = {"key": a["key"], **{k: a.get(k, "") for k in HEADER_KEYS}, "paragraphs": paras,
                "words": a["words"], "chars": a["chars"], "versions": []}
         jobs = []
-        if mode in ("default", "both"):
+        if mode in ("default", "both", "sample"):
             jobs.append(("default", lambda out, a=a: render_default(a, voice, out)))
         if mode in ("elevenlabs", "both"):
             jobs.append(("elevenlabs", lambda out, a=a: render_eleven(a, out)))
+        if mode == "sample":
+            jobs.append(("elevenlabs_sample", lambda out, a=a: render_eleven(a, out, sample=True)))
         for kind, fn in jobs:
-            name = f"full-{a['key']}-{'eleven' if kind == 'elevenlabs' else 'default'}.mp3"
+            name = f"full-{a['key']}-{ {'elevenlabs': 'eleven', 'elevenlabs_sample': 'elevensample'}.get(kind, 'default')}.mp3"
             local = os.path.join("audio_full", name)
             meta = local + ".meta.json"
             try:
@@ -362,7 +381,9 @@ def cmd_render(voice, mode, used_path=""):
             v = {"kind": kind, "engine": r["engine"], "voice": r["voice"], "credits": r["credits"],
                  "credits_estimated": r.get("credits_estimated", False),
                  "src": "audio/" + name, "seconds": round(ffprobe_seconds(local)),
-                 "timing": align(paras, r["words"])}
+                 "timing": align(paras[:sample_count(paras)] if kind == "elevenlabs_sample" else paras, r["words"])}
+            if kind == "elevenlabs_sample":
+                v["sample"] = True
             if r.get("voice_name"):
                 v["voice_name"] = r["voice_name"]
             if r.get("model"):

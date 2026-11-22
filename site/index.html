@@ -251,8 +251,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         <button type="button" data-mode="default" aria-pressed="true">Brief voice (free)</button>
         <button type="button" data-mode="elevenlabs" aria-pressed="false">ElevenLabs instead</button>
         <button type="button" data-mode="both" aria-pressed="false">Both, to compare</button>
+        <button type="button" data-mode="sample" aria-pressed="false">ElevenLabs sample (~1 min)</button>
       </div>
-      <p class="voice-note" id="article-voice-note">Used for the full audio of each new saved article, made when the brief runs. ElevenLabs costs about 1 credit per character (a 7,000-character article is about 7,000 credits).</p>
+      <p class="voice-note" id="article-voice-note">Used for the full audio of each new saved article, made when the brief runs. ElevenLabs costs about 1 credit per character (a 7,000-character article is about 7,000 credits). The sample makes the whole article in your brief voice plus only the first minute or so in ElevenLabs, for about 1,000 credits.</p>
     </div>
   </details>
 
@@ -715,7 +716,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     const vv = VOICES.find(x => x.id === v.voice);
     const name = v.engine === "elevenlabs" ? ((v.voice_name || "").split(" - ")[0] || "ElevenLabs voice") : (vv ? vv.name : v.voice);
     const cost = v.engine === "elevenlabs" ? "about " + Number(v.credits || 0).toLocaleString() + " credits" + (v.credits_estimated ? " (est.)" : "") : "free";
-    return name + " (" + (ENGINE_NAME[v.engine] || v.engine) + ") · " + cost;
+    return name + " (" + (ENGINE_NAME[v.engine] || v.engine) + (v.sample ? ", first minute" : "") + ") · " + cost;
   }
   async function renderArticle(brief, n, item, btn) {
     if (btn) { btn.disabled = true; btn.querySelector("span").textContent = "Loading the article…"; }
@@ -754,7 +755,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     }
     if (versions.length > 1) {
       versions.forEach((v) => { const vb = el("button", null, versionLabel(v)); vb.type = "button"; vb.dataset.src = v.src; vb.addEventListener("click", () => play(v)); vers.append(vb); });
-      head.append(el("span", "full-meta", "Two versions to compare. Pick one:"), vers);
+      head.append(el("span", "full-meta", versions.some(v => v.sample) ? "Compare: the ElevenLabs version is a sample of the first minute or so." : "Two versions to compare. Pick one:"), vers);
     }
     notes.forEach(v => head.append(el("span", "full-meta", (v.kind === "elevenlabs" ? "ElevenLabs: " : "") + v.note)));
     frag.append(head, holder, tr);

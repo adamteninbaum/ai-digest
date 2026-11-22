@@ -167,7 +167,7 @@ def write_site(d, out, dropbox="", existing="", words_path=""):
                 doc = json.load(fh)
             item["full"] = {"src": f"briefs/full/{item['saved']}.json", "words": doc.get("words"),
                             "versions": [{k: v[k] for k in ("kind", "engine", "voice", "voice_name", "model",
-                                                             "credits", "credits_estimated", "seconds", "note")
+                                                             "credits", "credits_estimated", "seconds", "note", "sample")
                                           if k in v} for v in doc.get("versions", [])]}
     brief["id"] = bid
     brief["audio"] = {"src": f"audio/AI-Audio-Digest-{bid}.mp3"}
