@@ -18,7 +18,8 @@ do not make a new brief, and do not change any other brief.
 - `pip install -q -r requirements.txt`. `Artifact` action `read` on the page (required
   before republishing), then read `briefs/index.json` and `briefs/<id>.json` with `path`.
 - Rebuild `digest.json` from that brief JSON: keep `id`, `date`, `headline`, `intro`,
-  `items` (with their `urls`, `source`, `media`, `wildcard`), `outro`, `footer`. Drop
+  `items` (with their `urls`, `source`, `media`, `wildcard`, and for saved articles `title`,
+  `origin`, `saved`, `full`; do not re-render full-article audio), `outro`, `footer`. Drop
   `audio` and `timing` (they are regenerated).
 - Fix what Adam asked for. Always also check these, whatever he wrote:
   - Audio: if the brief has no `audio.src`, run step 7 (`tts.py` falls back to the local
@@ -86,6 +87,35 @@ The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private 
   the original article it cites. For Hacker News items, link the article and add the
   discussion as `{"url": "<HN thread>", "label": "HN discussion"}` when it is lively.
 - Open (WebFetch) any online story you pick, so the spoken summary is accurate.
+
+## 2c. Adam's saved articles (Apple News, via Dropbox)
+His Mac saves each Apple News article he shares to Dropbox `/Claude/news-capture/articles/`
+as a .txt (header lines Title, Source, Author, Date, Link; Author and Date may be missing).
+EVERY new one becomes a story in this brief, on top of the 4 to 7 picks. Never use one twice.
+- Already used: `Artifact` action `read`, `url` = the page, `path` = `saved/used.json`. Keep the
+  local path as USED. If it does not exist yet (first run), use `""`.
+- `python3 saved.py fetch <USED>`. It lists the folder with the Dropbox API keys on the
+  environment and skips used files (by Dropbox file id, content hash and article link).
+  - If it prints `NEED_LINKS id:... id:...` and exits 3 (the Dropbox app may list but not
+    download), load the Dropbox connector tool `download_link` (ToolSearch
+    `select:mcp__Dropbox__download_link`), call it with `entries` = those ids and
+    `expiration_in_sec` = 900, Write its whole JSON result to `saved/links.json`, and run
+    `python3 saved.py fetch <USED> saved/links.json`. The links are single use: do not open them.
+  - If the Dropbox API itself fails (no keys, network): use the connector `list_folder` on
+    `/Claude/news-capture/articles` (recursive false), then `download_link` on every `.txt`
+    entry, and run the same `fetch <USED> saved/links.json`. The script still skips used ones.
+- It writes `saved/new.json` and prints one line per new article. None new: skip the rest
+  of this step and of step 7b.
+- Read each new article in `saved/new.json` (title, source, author, paragraphs). For each,
+  add one item to digest.json AFTER the regular picks (they do not count toward the 4 to 7):
+  `{"text": "<spoken blurb>", "title": "<Title>", "urls": [{"url": "<Link>", "label":
+  "Apple News"}], "source": "<Source>", "origin": "saved", "saved": "<key>"}`. The blurb is 2
+  or 3 conversational sentences on what the piece says and why it is worth his time; start
+  the first saved one with "From your saved articles:". The page marks it "Saved by Adam"
+  and adds a "Listen to the full article" button. Do not run media.py links for these
+  (apple.news pages have no useful media); leave `media` out.
+- Saved articles skip the "already-sent links" and vote rules: Adam chose them.
+- Mention them in the footer, e.g. "Saved articles: 2 (Vox, The Washington Post)".
 
 ## 3. Select 4 to 7 items (daily brief)
 - Known lanes: 3D animation and motion design tooling; generative video and image models;
@@ -189,6 +219,28 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   instead of a cached one.
 - If TTS fails entirely, see step 8 (`audio_note`).
 
+## 7b. Full-article audio for saved articles (only if step 2c found new ones)
+- Full-article voice: `ArtifactData` action `get`, `url` = the page, `collection` =
+  `control`, `doc_id` = `article_voice`. Its `mode` is `default` (Adam's brief voice, free),
+  `elevenlabs` (ElevenLabs instead) or `both` (both, to compare). Missing or failed read:
+  `default`.
+- `python3 saved.py render <VOICE_ID from step 7> <mode> <USED from step 2c>`. It renders
+  each new article's full text (the brief voice via tts.py, and/or ElevenLabs via
+  elevenlabs_tts.py), writes `out/briefs/full/<key>.json` with word timings, the MP3s under
+  `audio_full/`, and the merged `out/saved/used.json`. Its LAST stdout line is a JSON map of
+  Artifact `files` entries: add all of them to the step 8 publish. Run it BEFORE
+  `build_digest.py site` (which reads those files to add the button).
+- Kokoro is slow on this machine (about 7 minutes per 1,000 words), so render stops safely
+  after about 8 minutes and prints `PARTIAL ...` (exit code 4). Use a Bash timeout of
+  600000 ms and run the SAME command again until it prints the files map. Finished
+  paragraphs, versions and ElevenLabs audio are cached and never redone (no double credits).
+  Two long articles can take 30 minutes or more; that is expected.
+- ElevenLabs needs the network secret for `api.elevenlabs.io` (header `xi-api-key`) on the
+  cloud environment; the proxy adds the key. If it fails, the script records a note (and for
+  `elevenlabs` mode falls back to the brief voice); say so in the step 9 summary with the
+  credits used (`credits` in each version).
+- Even if audio fails, keep the items, publish `used.json`, and carry on.
+
 ## 8. Publish to the digest page (this replaces email)
 Adam does not want email: the Gmail connector wraps every link in a Google redirect page.
 - `python3 build_digest.py site digest.json out "" "<local path of the
@@ -198,7 +250,9 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   `url` = https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy, `file_path` = `site/index.html` from this repo, and `files` =
   `{"briefs/index.json": "out/briefs/index.json", "briefs/<id>.json": "out/briefs/<id>.json",
   "audio/AI-Audio-Digest-<id>.mp3": "<the MP3 path>"}` plus every `media/...` entry step 6b
-  printed and you kept. Do not pass `icon`,
+  printed and you kept, plus every entry step 7b printed (`briefs/full/...`,
+  `audio/full-...`, `saved/used.json`). `saved/used.json` is what stops an article being used
+  twice, so it must be in the same publish as the brief. Do not pass `icon`,
   `capabilities` or `force`. Files you leave out (older briefs and audio) are kept.
 - If TTS failed, set `"audio_note": "Audio unavailable this run: <reason>"` in digest.json
   and leave the MP3 out of `files`.
@@ -225,4 +279,5 @@ This summary is what Adam's phone alert shows, so its first line must be "AI dig
 ready:" plus the top 2 stories in a few words. Then reply with a one-paragraph summary that
 starts with the page link
 (https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy): items sent, issues read, audio status
-(on the page or failed), media (how many items got an image or video), ntfy (the `sent` id, or why it failed), links resolved vs fell back, HN status, anything that failed.
+(on the page or failed), media (how many items got an image or video), saved articles (how
+many, full-audio voice per article, ElevenLabs credits used), ntfy (the `sent` id, or why it failed), links resolved vs fell back, HN status, anything that failed.

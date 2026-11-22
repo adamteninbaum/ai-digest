@@ -18,6 +18,13 @@ published to a private claude.ai page: https://claude.ai/artifact/F5KSHeyUzh53Ab
 - `notify.py`: ntfy phone alert that opens the new brief when tapped (sent every run,
   alongside the Claude app alert).
 - `preferences.md`: optional feedback the selection step reads each run.
+- `saved.py`: Adam's saved Apple News articles (Dropbox `/Claude/news-capture/articles/`).
+  Each new one becomes a "Saved by Adam" story with a "Listen to the full article" button;
+  `saved/used.json` on the page stops reuse. Full audio is made when the brief runs.
+- `elevenlabs_tts.py`: optional ElevenLabs voice for full articles (the page's "Full-article
+  voice" setting). Key = network secret on the cloud environment for `api.elevenlabs.io`,
+  header `xi-api-key`. Never in the repo. Optional env vars: `ELEVENLABS_VOICE_ID`,
+  `ELEVENLABS_MODEL`.
 - Audio goes to Dropbox; the `audio` branch is only a fallback if Dropbox fails.
 
 Environment variables (cloud environment settings): `DROPBOX_APP_KEY`,

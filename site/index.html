@@ -91,7 +91,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .views { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -20px; }
 .views button[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .interests { margin-top: -20px; }
-.interests[hidden], .views[hidden] { display: none; }
+.interests[hidden], .views[hidden], .article-voice[hidden] { display: none; }
 .views button { font-family: var(--font-mono); font-size: 0.75rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
 .views button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .flag-card { display: flex; flex-direction: column; gap: 8px; padding-block: 16px; border-top: 1px solid var(--line); }
@@ -163,6 +163,22 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .origin { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
 .origin.gmail { color: var(--accent); border-color: var(--accent); }
 .origin.web { color: var(--ink); }
+.origin.saved { color: var(--surface); background: var(--wild); border-color: var(--wild); }
+.seg-title { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; line-height: 1.25; margin: 0; }
+.full-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 0.78rem; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); cursor: pointer; }
+.full-btn svg { width: 14px; height: 14px; fill: currentColor; }
+.full-btn:disabled { opacity: 0.6; cursor: progress; }
+.full-meta { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.back { align-self: flex-start; font-family: var(--font-mono); font-size: 0.75rem; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.vers { display: flex; flex-wrap: wrap; gap: 6px; }
+.vers button { font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; text-align: left; }
+.vers button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.article-body .say:first-child { font-family: var(--font-display); font-weight: 500; }
+.article-voice { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.article-voice h4 { font-family: var(--font-display); font-size: 1rem; margin: 0; }
+.article-voice .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.article-voice .opts button { font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+.article-voice .opts button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
 .media { margin: 2px 0 0; display: block; max-width: 100%; }
 .media img, .media video { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
 .media video { aspect-ratio: 16 / 9; object-fit: contain; background: #000; }
@@ -229,6 +245,15 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     <summary>Voice <span class="cur" id="voice-cur"></span></summary>
     <p class="voice-note" id="voice-note">Tap play to hear a sample. Your pick is used from the next brief on.</p>
     <ul class="voice-list" id="voice-list"></ul>
+    <div class="article-voice" id="article-voice" hidden>
+      <h4>Full-article voice (saved articles)</h4>
+      <div class="opts" role="group" aria-label="Full-article voice">
+        <button type="button" data-mode="default" aria-pressed="true">Brief voice (free)</button>
+        <button type="button" data-mode="elevenlabs" aria-pressed="false">ElevenLabs instead</button>
+        <button type="button" data-mode="both" aria-pressed="false">Both, to compare</button>
+      </div>
+      <p class="voice-note" id="article-voice-note">Used for the full audio of each new saved article, made when the brief runs. ElevenLabs costs about 1 credit per character (a 7,000-character article is about 7,000 credits).</p>
+    </div>
   </details>
 
   <section class="log" id="log" hidden>
@@ -509,9 +534,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         const SKIP_PREV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.5v14H6zM20 5v14L9.5 12z"/></svg>';
         const SKIP_NEXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 5H18v14h-2.5zM4 5v14l10.5-7z"/></svg>';
         const prevBtn = el("button", "skip"); prevBtn.type = "button"; prevBtn.id = "prev-item"; prevBtn.innerHTML = SKIP_PREV;
-        prevBtn.setAttribute("aria-label", "Previous item"); prevBtn.title = "Previous item";
+        const unit = b.kind === "article" ? "paragraph" : "item";
+        prevBtn.setAttribute("aria-label", "Previous " + unit); prevBtn.title = "Previous " + unit;
         const nextBtn = el("button", "skip"); nextBtn.type = "button"; nextBtn.id = "next-item"; nextBtn.innerHTML = SKIP_NEXT;
-        nextBtn.setAttribute("aria-label", "Next item"); nextBtn.title = "Next item";
+        nextBtn.setAttribute("aria-label", "Next " + unit); nextBtn.title = "Next " + unit;
         const nItems = b.items.length;
         const curSeg = () => { let k = 0; segs.forEach((x, i) => { if (x.s <= audio.currentTime + 0.25) k = i; }); return k; };
         const go = (i) => { audio.currentTime = segs[i].s; if (audio.paused) audio.play().catch(() => {}); };
@@ -522,7 +548,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         const pos = el("span", "item-pos", "Intro");
         const syncPos = () => {
           const p = segs[curSeg()].p;
-          pos.textContent = p === 0 ? "Intro" : p > nItems ? "Sign-off" : "Item " + p + " of " + nItems;
+          pos.textContent = b.kind === "article" ? (p === 0 ? "Title" : "Paragraph " + p + " of " + (b.paras - 1))
+            : p === 0 ? "Intro" : p > nItems ? "Sign-off" : "Item " + p + " of " + nItems;
           const k = curSeg();
           prevBtn.disabled = k === 0 && audio.currentTime < 3;
           nextBtn.disabled = k >= segs.length - 1;
@@ -577,7 +604,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         speeds.append(fb);
       }
       const vv = VOICES.find(v => v.id === b.audio.voice);
-      if (vv) foot.append(el("span", "src", "Voice: " + vv.name));
+      if (b.audio.label) foot.append(el("span", "src", "Voice: " + b.audio.label));
+      else if (vv) foot.append(el("span", "src", "Voice: " + vv.name + (b.audio.voice === "edge_andrew" ? " (Microsoft Edge)" : " (Kokoro)") + " · free"));
       if (b.audio.dropbox) {
         const dl = el("a", "dropbox", "Open MP3 in Dropbox");
         dl.href = b.audio.dropbox; dl.target = "_blank"; dl.rel = "noopener";
@@ -653,6 +681,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     if (o === "gmail") return { cls: "gmail", text: "From your Gmail" };
     if (o === "web") return { cls: "web", text: "Found online" };
     if (o === "both") return { cls: "gmail", text: "Gmail + online" };
+    if (o === "saved") return { cls: "saved", text: "Saved by Adam" };
     return null;
   }
 
@@ -678,6 +707,61 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       fig.append(img);
     }
     return fig;
+  }
+
+  // Saved articles: the full text and full-length audio, made when the brief ran (saved.py).
+  const ENGINE_NAME = { edge: "Microsoft Edge", kokoro: "Kokoro", elevenlabs: "ElevenLabs" };
+  function versionLabel(v) {
+    const vv = VOICES.find(x => x.id === v.voice);
+    const name = v.engine === "elevenlabs" ? ((v.voice_name || "").split(" - ")[0] || "ElevenLabs voice") : (vv ? vv.name : v.voice);
+    const cost = v.engine === "elevenlabs" ? "about " + Number(v.credits || 0).toLocaleString() + " credits" + (v.credits_estimated ? " (est.)" : "") : "free";
+    return name + " (" + (ENGINE_NAME[v.engine] || v.engine) + ") · " + cost;
+  }
+  async function renderArticle(brief, n, item, btn) {
+    if (btn) { btn.disabled = true; btn.querySelector("span").textContent = "Loading the article…"; }
+    let doc;
+    try { doc = await getJSON(item.full.src); }
+    catch (e) { if (btn) { btn.disabled = false; btn.querySelector("span").textContent = "Couldn't load it. Tap to retry"; } return; }
+    stopSync(); currentAudio = null; currentBrief = null;
+    const main = $("#brief");
+    const frag = el("div"); frag.style.display = "flex"; frag.style.flexDirection = "column"; frag.style.gap = "20px";
+    const head = el("div", "brief-head");
+    const back = el("button", "back", "← Back to the brief"); back.type = "button"; back.id = "article-back";
+    back.addEventListener("click", () => openItem(idOf(brief), n + 1));
+    head.append(back, el("span", "eyebrow", "Saved by Adam · Full article"), el("h2", null, doc.title || item.title || "Saved article"));
+    const stats = el("div", "stats");
+    [doc.source, doc.author ? "by " + doc.author : "", doc.date, (doc.words || 0).toLocaleString() + " words"].filter(Boolean).forEach(t => stats.append(el("span", null, t)));
+    head.append(stats);
+    if (doc.link) { const a = el("a", null, "Open the original (Apple News)"); a.href = doc.link; a.target = "_blank"; a.rel = "noopener"; a.className = "dropbox"; head.append(a); }
+    const versions = (doc.versions || []).filter(v => v.src);
+    const notes = (doc.versions || []).filter(v => v.note);
+    const holder = el("div"); holder.style.display = "contents";
+    const tr = el("section", "transcript article-body");
+    tr.append(el("h3", null, "Full text"));
+    (doc.paragraphs || []).forEach((p, i) => tr.append(wordsInto(el("p", "say"), p, i)));
+    const sentinel = el("div", "player-sentinel");
+    head.append(sentinel);
+    const vers = el("div", "vers");
+    function play(v) {
+      stopSync(); currentAudio = null;
+      vers.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.src === v.src ? "true" : "false"));
+      const pseudo = { kind: "article", paras: (doc.paragraphs || []).length, items: [], timing: v.timing,
+        audio: { src: v.src, voice: v.voice, label: versionLabel(v) } };
+      const box = renderPlayer(pseudo);
+      holder.replaceChildren(box);
+      if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => box.classList.toggle("stuck", !e.isIntersecting && e.boundingClientRect.top < 0)).observe(sentinel);
+      wireSync(pseudo, tr);
+    }
+    if (versions.length > 1) {
+      versions.forEach((v) => { const vb = el("button", null, versionLabel(v)); vb.type = "button"; vb.dataset.src = v.src; vb.addEventListener("click", () => play(v)); vers.append(vb); });
+      head.append(el("span", "full-meta", "Two versions to compare. Pick one:"), vers);
+    }
+    notes.forEach(v => head.append(el("span", "full-meta", (v.kind === "elevenlabs" ? "ElevenLabs: " : "") + v.note)));
+    frag.append(head, holder, tr);
+    main.replaceChildren(frag);
+    if (versions.length) play(versions[0]);
+    else holder.replaceChildren(el("p", "audio-missing", "No audio for this article."));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   let currentBrief = null;
@@ -711,8 +795,18 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       seg.append(el("span", "seg-no", String(n + 1).padStart(2, "0")));
       const body = el("div", "seg-body");
       if (wild) body.append(el("span", "tag", "Wildcard"));
+      if (item.title) body.append(el("h3", "seg-title", item.title));
       body.append(wordsInto(el("p"), item.text, n + 1));
       (item.media || []).slice(0, 1).forEach((m) => body.append(mediaEl(m)));
+      if (item.full && item.full.src) {
+        const fb = el("button", "full-btn"); fb.type = "button"; fb.id = "full-" + (item.saved || n);
+        fb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><span>Listen to the full article</span>';
+        fb.addEventListener("click", () => renderArticle(b, n, item, fb));
+        body.append(fb);
+        const vs = (item.full.versions || []).filter(v => !v.note);
+        const mins = vs[0] && vs[0].seconds ? Math.max(1, Math.round(vs[0].seconds / 60)) + " min · " : "";
+        body.append(el("span", "full-meta", mins + (item.full.words ? item.full.words.toLocaleString() + " words · " : "") + (vs.length ? vs.map(versionLabel).join(" / ") : "audio unavailable")));
+      }
       const links = el("div", "links");
       (item.urls || []).forEach((u) => {
         const url = typeof u === "string" ? u : u.url;
@@ -982,6 +1076,22 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     if (!db) return;
     try { const d = await db.doc("control/voice").get(); if (d.exists && d.data().voice) chosenVoice = d.data().voice; } catch (e) {}
     renderVoices();
+    let mode = "default";
+    $("#article-voice").hidden = false;
+    try { const d = await db.doc("control/article_voice").get(); if (d.exists && d.data().mode) mode = d.data().mode; } catch (e) {}
+    const btns = document.querySelectorAll("#article-voice .opts button");
+    const paint = () => btns.forEach(x => x.setAttribute("aria-pressed", x.dataset.mode === mode ? "true" : "false"));
+    paint();
+    btns.forEach((x) => x.addEventListener("click", async () => {
+      if (x.dataset.mode === mode) return;
+      btns.forEach(y => y.disabled = true);
+      try {
+        await db.doc("control/article_voice").set({ mode: x.dataset.mode, at: new Date().toISOString() });
+        mode = x.dataset.mode;
+        $("#article-voice-note").textContent = "Saved. New saved articles in the next brief use: " + x.textContent + ".";
+      } catch (e) { $("#article-voice-note").textContent = "Couldn't save that. Try again."; }
+      btns.forEach(y => y.disabled = false); paint();
+    }));
   })();
 
   function renderLog() {

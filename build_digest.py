@@ -24,6 +24,9 @@ Usage:
          .words.json tts.py wrote; with it the page highlights each word as it is spoken.
 
 Items may set "wildcard": true; the page tags those.
+Saved articles (saved.py): "origin": "saved", "saved": "<key>", "title": "...". If
+OUT_DIR/briefs/full/<key>.json exists (saved.py render writes it), "site" adds "full" to the
+item and the page shows a "Listen to the full article" button.
 """
 import os
 from datetime import datetime, timezone
@@ -155,6 +158,17 @@ def write_site(d, out, dropbox="", existing="", words_path=""):
     index = read_index(existing)
     bid = d.get("id") or next_id(index, date)
     brief = {k: d[k] for k in ("date", "intro", "items", "outro", "footer", "headline") if k in d}
+    for item in brief["items"]:
+        # Saved articles: summarize the full-article file saved.py wrote, so the page can show
+        # the "Listen to the full article" button with its voices and credits before loading it.
+        full = os.path.join(out, "briefs", "full", f"{item.get('saved')}.json") if item.get("saved") else ""
+        if full and os.path.exists(full):
+            with open(full, encoding="utf-8") as fh:
+                doc = json.load(fh)
+            item["full"] = {"src": f"briefs/full/{item['saved']}.json", "words": doc.get("words"),
+                            "versions": [{k: v[k] for k in ("kind", "engine", "voice", "voice_name", "model",
+                                                             "credits", "credits_estimated", "seconds", "note")
+                                          if k in v} for v in doc.get("versions", [])]}
     brief["id"] = bid
     brief["audio"] = {"src": f"audio/AI-Audio-Digest-{bid}.mp3"}
     if d.get("voice"):
