@@ -128,6 +128,15 @@ EVERY new one becomes a story in this brief, on top of the 4 to 7 picks. Never u
     entry, and run the same `fetch <USED> saved/links.json`. The script still skips used ones.
 - It writes `saved/new.json` and prints one line per new article. None new: skip the rest
   of this step and of step 8b.
+- Clean each new article before anything else uses it. `saved.py` already strips the usual
+  Apple News clutter (clean_article.py), but read every article's `paragraphs` in
+  `saved/new.json` and remove anything that is still not the article itself: ads, "Popular in
+  News+" or "More ... News" widgets, newsletter or app sign-ups, "Write to <author> at
+  <email>", author bios at the end, image or photo credits, and scrambled fragments of pull
+  quotes (delete a fragment paragraph, or trim the garbled words at the start of a paragraph
+  back to where the real sentence starts). Never reword the author's sentences. Save
+  `saved/new.json` and update each article's `words` and `chars` (sum over paragraphs). This
+  cleaned text is what the audio, the page and the share files (8c) use.
 - Read each new article in `saved/new.json` (title, source, author, paragraphs). For each,
   add one item to digest.json AFTER the regular picks (they do not count toward the 4 to 7):
   `{"text": "<spoken blurb>", "title": "<Title>", "urls": [{"url": "<Link>", "label":

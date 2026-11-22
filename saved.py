@@ -51,6 +51,8 @@ import unicodedata
 
 import requests
 
+from clean_article import clean
+
 FOLDER = "/Claude/news-capture/articles"
 SAVED_DIR = "saved"
 CA = "/root/.ccr/ca-bundle.crt"
@@ -117,6 +119,8 @@ def parse(text):
         paras = paras[1:]
     # Photo credit lines such as "(Illustration by ... / Getty Images)" are not worth hearing.
     paras = [p for p in paras if not (p.startswith("(") and p.endswith(")") and len(p) < 300)]
+    # Apple News page clutter: "Popular in News+", sign-ups, "Write to ... at ...", widgets.
+    paras, _ = clean(paras, meta["title"])
     return meta, paras
 
 

@@ -30,6 +30,7 @@ from html import unescape
 
 import requests
 
+from clean_article import clean
 from saved import VERIFY, token
 
 SHARED = "/Claude/news-capture/shared"
@@ -74,9 +75,8 @@ def clean_paragraphs(doc):
     # The first spoken paragraph repeats the title and byline ("<Title>. From <Source>, by ...").
     if paras and doc.get("title") and paras[0].startswith(doc["title"][:40]):
         paras = paras[1:]
-    # Leftovers from the Apple News capture: image placeholders, "Follow us" lines, the title again.
-    junk = re.compile(r"^\[image\b|follow us in apple news|^photo:", re.I)
-    return [p for p in paras if not junk.search(p.strip()) and p.strip() != (doc.get("title") or "").strip()]
+    # Leftovers from the Apple News capture (ads, sign-ups, widgets): see clean_article.py.
+    return clean(paras, doc.get("title") or "")[0]
 
 
 def byline(doc):
