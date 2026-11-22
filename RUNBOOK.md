@@ -59,7 +59,7 @@ discovery or WebSearch, do not read votes or topics, and do not change other bri
 - Steps 7 and 8 as usual (brief audio, publish, both alerts; for notify.py use the article
   titles as the summary). Then set the same `control/saved_now` doc to `{"status": "done",
   "id": "<id>", "at": "<UTC now>"}`. The brief is now on the page.
-- Then step 8b (full-article audio, added afterward with a second publish).
+- Then steps 8b (full-article audio) and 8c (share links), each added afterward with another publish.
 - Finish with "Saved-only brief <id>: <n> articles" plus audio status and credits used.
 
 ## 1. Work out the window (state lives on the digest page, no state files)
@@ -274,7 +274,7 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
   `htmlBody` = email.html, `body` = email.txt, verbatim.
 
-Then do step 8b if step 2c found new saved articles.
+Then do steps 8b and 8c if step 2c found new saved articles.
 
 ## 8b. Full-article audio for saved articles (AFTER step 8; only if step 2c found new ones)
 The brief is already published and the alerts sent. This adds the "Listen to the full article"
@@ -303,6 +303,18 @@ button afterward, so the slow full-article audio never holds up the brief.
   `elevenlabs` mode falls back to the brief voice); say so in the step 9 summary with the
   credits used (`credits` in each version).
 - If the full-article audio fails, leave the brief as it is (it is already published).
+
+## 8c. Share with friends & family (AFTER step 8b; for every new saved article)
+Adam wants a "Share with friends & family" button on every saved article. Each one gets a
+public Dropbox folder `/Claude/news-capture/shared/<date> <title>/` with the article as a PDF
+(text plus lead image) and its full audio; the page shows the button when an item has
+`full.share`.
+- `python3 share.py out/briefs/<id>.json` (after 8b, so the full audio exists; run it even if
+  8b failed: the PDF still gets made). It skips items that already have a link, prints one line
+  per article and `shared N`.
+- Then publish once more exactly as in step 8b (`briefs/<id>.json` only is enough). No alerts.
+- If it fails (Dropbox keys, network), the brief stays as it is; say so in the step 9 summary.
+  Never drop a share link that is already on an item.
 
 ## 9. Finish
 This summary is what Adam's phone alert shows, so its first line must be "AI digest
