@@ -260,6 +260,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         <button type="button" data-mode="off" aria-pressed="false">Off (no full audio)</button>
       </div>
       <p class="voice-note" id="article-voice-note">Used for the full audio of each new saved article, made when the brief runs. ElevenLabs costs about 1 credit per character (a 7,000-character article is about 7,000 credits). The sample makes the whole article in your brief voice plus only the first minute or so in ElevenLabs, for about 1,000 credits.</p>
+      <h4 style="margin-top:10px">ElevenLabs voice <span class="cur" id="el-voice-cur" style="font-family:var(--font-mono);font-weight:400;font-size:0.75rem;color:var(--muted)"></span></h4>
+      <p class="voice-note" id="el-voice-note">Used whenever ElevenLabs reads an article (instead, both, or the sample). Tap play to hear a free preview.</p>
+      <ul class="voice-list" id="el-voice-list"></ul>
     </div>
   </details>
 
@@ -1127,16 +1130,64 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     try { const d = await db.doc("control/voice").get(); if (d.exists && d.data().voice) chosenVoice = d.data().voice; } catch (e) {}
     renderVoices();
     let mode = "default";
+    // control/article_voice holds both the mode and the ElevenLabs voice; every save writes the whole doc.
+    let av = {};
     $("#article-voice").hidden = false;
-    try { const d = await db.doc("control/article_voice").get(); if (d.exists && d.data().mode) mode = d.data().mode; } catch (e) {}
+    try { const d = await db.doc("control/article_voice").get(); if (d.exists) { av = d.data() || {}; if (av.mode) mode = av.mode; } } catch (e) {}
+    const saveAv = (patch) => { const next = { ...av, ...patch, at: new Date().toISOString() }; return db.doc("control/article_voice").set(next).then(() => { av = next; }); };
     const btns = document.querySelectorAll("#article-voice .opts button");
     const paint = () => btns.forEach(x => x.setAttribute("aria-pressed", x.dataset.mode === mode ? "true" : "false"));
     paint();
+    // ElevenLabs voice list: voices/elevenlabs.json is refreshed by elevenlabs_voices.py (free previews only).
+    const EL_DEFAULT = "JBFqnCBsd6RMkjVDRZzb";
+    let elVoices = [];
+    try { elVoices = await getJSON("voices/elevenlabs.json"); } catch (e) {}
+    function renderElVoices() {
+      const list = $("#el-voice-list");
+      list.replaceChildren();
+      const cur = av.el_voice || EL_DEFAULT;
+      const cv = elVoices.find(v => v.id === cur);
+      $("#el-voice-cur").textContent = cv ? cv.name : (av.el_voice_name || "George");
+      elVoices.forEach((v) => {
+        const li = el("li");
+        const pb = el("button", "vplay"); pb.type = "button"; pb.id = "elplay-" + v.id; pb.innerHTML = PLAY_S;
+        pb.dataset.label = "Play " + v.name + " preview"; pb.setAttribute("aria-label", pb.dataset.label); pb.setAttribute("aria-pressed", "false");
+        if (!v.sample) pb.disabled = true;
+        pb.addEventListener("click", () => {
+          const was = sampleBtn === pb;
+          stopSample();
+          if (was || !v.sample) return;
+          if (currentAudio && !currentAudio.paused) currentAudio.pause();
+          sample = new Audio(v.sample);
+          sampleBtn = pb; pb.innerHTML = STOP_S; pb.setAttribute("aria-pressed", "true"); pb.setAttribute("aria-label", "Stop preview");
+          sample.addEventListener("ended", stopSample);
+          sample.play().catch(stopSample);
+        });
+        const txt = el("div");
+        txt.append(el("span", "vname", v.name), el("span", "vdesc", v.desc || ""));
+        const on = v.id === cur;
+        const use = el("button", "vuse", on ? "Selected" : "Use this voice"); use.type = "button"; use.id = "eluse-" + v.id;
+        use.setAttribute("aria-pressed", on ? "true" : "false");
+        use.addEventListener("click", async () => {
+          if (v.id === (av.el_voice || EL_DEFAULT)) return;
+          use.disabled = true; use.textContent = "Saving…";
+          try {
+            await saveAv({ el_voice: v.id, el_voice_name: v.name });
+            $("#el-voice-note").textContent = v.name + " is set for ElevenLabs. New saved articles use it.";
+          } catch (e) { $("#el-voice-note").textContent = "Couldn't save your pick. Try again."; }
+          renderElVoices();
+        });
+        li.append(pb, txt, use);
+        list.append(li);
+      });
+      if (!elVoices.length) $("#el-voice-note").textContent = "ElevenLabs voice list isn't available yet.";
+    }
+    renderElVoices();
     btns.forEach((x) => x.addEventListener("click", async () => {
       if (x.dataset.mode === mode) return;
       btns.forEach(y => y.disabled = true);
       try {
-        await db.doc("control/article_voice").set({ mode: x.dataset.mode, at: new Date().toISOString() });
+        await saveAv({ mode: x.dataset.mode });
         mode = x.dataset.mode;
         $("#article-voice-note").textContent = "Saved. New saved articles in the next brief use: " + x.textContent + ".";
       } catch (e) { $("#article-voice-note").textContent = "Couldn't save that. Try again."; }
@@ -1209,3 +1260,5 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   start();
 })();
 </script>
+
+
