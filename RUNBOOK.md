@@ -307,7 +307,8 @@ button afterward, so the slow full-article audio never holds up the brief.
 ## 8c. Share with friends & family (AFTER step 8b; for every new saved article)
 Adam wants a "Share with friends & family" button on every saved article. Each one gets a
 public Dropbox folder `/Claude/news-capture/shared/<date> <title>/` with the article as a PDF
-(text plus lead image) and its full audio; the page shows the button when an item has
+(text plus lead image), a plain text copy (`<title> (text).txt`) and its full audio; the page
+shows the button when an item has
 `full.share`.
 - `python3 -m pip install -q reportlab && python3 -m pip install -q --ignore-installed Pillow`
   (an old system Pillow can break the PDF step), then

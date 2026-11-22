@@ -2,17 +2,19 @@
 
 For every saved-article item in a brief, makes a Dropbox folder
 /Claude/news-capture/shared/<date> <title>/ holding the article as a PDF (title, byline,
-lead image when the article page has one, full text) and its full audio as an MP3, makes a
+lead image when the article page has one, full text), a plain text copy, and its full audio
+as an MP3, makes a
 public view-only link to the folder, and stores it on the item as item["full"]["share"].
 The page turns that into the share button (phone share sheet, else copy the link).
 
 Usage:
-  python3 share.py BRIEF_JSON [FULL_DIR] [AUDIO_ROOT]
+  python3 share.py [--all] BRIEF_JSON [FULL_DIR] [AUDIO_ROOT]
     BRIEF_JSON  the brief to update in place (e.g. out/briefs/<id>.json)
     FULL_DIR    folder with the full-article JSONs (default: out/briefs/full)
     AUDIO_ROOT  folder the versions' "src" paths are relative to, used when the MP3 is not in
                 ./audio_full/ where saved.py render leaves it (default: current folder)
-Items that already have a share link are skipped, so it is safe to run again.
+Items that already have a share link are skipped, so it is safe to run again; with --all
+they are rebuilt too (files overwritten, the folder's existing link reused).
 Prints one line per article and "shared N" at the end. Exit code 1 if any article failed.
 
 Needs DROPBOX_APP_KEY / _SECRET / _REFRESH_TOKEN (the same keys saved.py uses) with scopes
@@ -67,6 +69,25 @@ def lead_image(link):
         return None
 
 
+def clean_paragraphs(doc):
+    paras = list(doc.get("paragraphs") or [])
+    # The first spoken paragraph repeats the title and byline ("<Title>. From <Source>, by ...").
+    if paras and doc.get("title") and paras[0].startswith(doc["title"][:40]):
+        paras = paras[1:]
+    # Leftovers from the Apple News capture: image placeholders, "Follow us" lines, the title again.
+    junk = re.compile(r"^\[image\b|follow us in apple news|^photo:", re.I)
+    return [p for p in paras if not junk.search(p.strip()) and p.strip() != (doc.get("title") or "").strip()]
+
+
+def byline(doc):
+    return " · ".join(x for x in (doc.get("source"), doc.get("author") and "by " + doc["author"], doc.get("date")) if x)
+
+
+def make_txt(doc):
+    head = [doc.get("title") or "Article", byline(doc), doc.get("link") or ""]
+    return ("\n".join(h for h in head if h) + "\n\n" + "\n\n".join(clean_paragraphs(doc)) + "\n").encode("utf-8")
+
+
 def make_pdf(doc, path):
     from reportlab.lib.enums import TA_LEFT
     from reportlab.lib.pagesizes import letter
@@ -80,7 +101,7 @@ def make_pdf(doc, path):
     meta = ParagraphStyle("m", parent=ss["Normal"], fontName="Helvetica", fontSize=9.5, leading=13, textColor="#555555")
     body = ParagraphStyle("b", parent=ss["Normal"], fontName="Times-Roman", fontSize=11.5, leading=16.5, spaceAfter=8)
     flow = [Paragraph(esc(doc.get("title")), title), Spacer(1, 4)]
-    by = " · ".join(x for x in (doc.get("source"), doc.get("author") and "by " + doc["author"], doc.get("date")) if x)
+    by = byline(doc)
     if by:
         flow.append(Paragraph(esc(by), meta))
     if doc.get("link"):
@@ -94,14 +115,7 @@ def make_pdf(doc, path):
         if img.drawHeight > 4.5 * inch:
             img.drawWidth, img.drawHeight = img.drawWidth * 4.5 * inch / img.drawHeight, 4.5 * inch
         flow += [img, Spacer(1, 14)]
-    paras = list(doc.get("paragraphs") or [])
-    # The first spoken paragraph repeats the title and byline ("<Title>. From <Source>, by ...").
-    if paras and doc.get("title") and paras[0].startswith(doc["title"][:40]):
-        paras = paras[1:]
-    # Leftovers from the Apple News capture: image placeholders, "Follow us" lines, the title again.
-    junk = re.compile(r"^\[image\b|follow us in apple news|^photo:", re.I)
-    paras = [p for p in paras if not junk.search(p.strip()) and p.strip() != (doc.get("title") or "").strip()]
-    flow += [Paragraph(esc(p), body) for p in paras]
+    flow += [Paragraph(esc(p), body) for p in clean_paragraphs(doc)]
     SimpleDocTemplate(path, pagesize=letter, leftMargin=inch, rightMargin=inch, topMargin=0.9 * inch,
                       bottomMargin=0.9 * inch, title=doc.get("title") or "Article",
                       author=doc.get("author") or "").build(flow)
@@ -134,12 +148,14 @@ def public_link(tok, path):
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
+    redo = "--all" in sys.argv
+    sys.argv = [a for a in sys.argv if a != "--all"]
     brief_path = sys.argv[1]
     full_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.join("out", "briefs", "full")
     audio_root = sys.argv[3] if len(sys.argv) > 3 else "."
     with open(brief_path, encoding="utf-8") as fh:
         brief = json.load(fh)
-    todo = [it for it in brief.get("items", []) if it.get("saved") and it.get("full") and not it["full"].get("share")]
+    todo = [it for it in brief.get("items", []) if it.get("saved") and it.get("full") and (redo or not it["full"].get("share"))]
     if not todo:
         print("shared 0 (no saved articles without a link)")
         return
@@ -157,6 +173,7 @@ def main():
             had_img = make_pdf(doc, pdf)
             with open(pdf, "rb") as fh:
                 upload(tok, fh.read(), f"{folder}/{name}.pdf")
+            upload(tok, make_txt(doc), f"{folder}/{name} (text).txt")
             mp3 = next((v["src"] for v in doc.get("versions", []) if v.get("src") and not v.get("sample")), None)
             # saved.py render keeps the MP3 locally in audio_full/; a page copy lives under audio/.
             cands = [os.path.join("audio_full", os.path.basename(mp3)), os.path.join(audio_root, mp3)] if mp3 else []
