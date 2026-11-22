@@ -41,13 +41,34 @@ do not make a new brief, and do not change any other brief.
 - No ntfy alert and no PushNotification for a repair. Finish with one line: "Brief <id>
   fixed: <what changed>" (or what could not be fixed and why).
 
+## 0b. Saved-only mode ("Saved articles now")
+If the run text starts with "SAVED ONLY MODE", Adam tapped "Saved articles now" on the page.
+Make a brief with ONLY his new saved articles. Do not fetch newsletters, do not run
+discovery or WebSearch, do not read votes or topics, and do not change other briefs.
+- `pip install -q -r requirements.txt`. Step 1's first two bullets only (read the page, and
+  `briefs/index.json`; keep its local path). Skip the window and the already-sent links.
+- Step 2c in full (fetch, blurbs, items with `"origin": "saved"`).
+- If there are no new saved articles: publish nothing. `ArtifactData` action `set`, `url` =
+  the page, `collection` = `control`, `doc_id` = `saved_now`, `data` = `{"status": "none",
+  "at": "<UTC now>"}` (read it first and pass its `version` as `if_version` if it exists), so
+  the page tells Adam. No alerts. Finish with "Saved-only run: no new saved articles."
+- Otherwise write digest.json as in step 6 with: `"kind": "saved"`, `intro` like "Hey Adam,
+  here are the articles you saved.", the saved items only, a short `outro`, `headline` naming
+  them, `footer` "Saved articles only. Newsletters come in the next daily brief." Get `id`
+  with `nextid` as usual. No media (skip step 6b).
+- Steps 7, 7b and 8 as usual (brief audio, full-article audio, publish with every file, both
+  alerts; for notify.py use the article titles as the summary). Then set the same
+  `control/saved_now` doc to `{"status": "done", "id": "<id>", "at": "<UTC now>"}`.
+- Finish with "Saved-only brief <id>: <n> articles" plus audio status and credits used.
+
 ## 1. Work out the window (state lives on the digest page, no state files)
 The digest page is https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy (a private claude.ai Artifact Adam owns).
 - `Artifact` action `read` with `url` = the page (required before you can republish it).
 - `Artifact` action `read` with `url` = the page and `path` = `briefs/index.json`; it saves
   the file locally and tells you where. Keep that path for step 8.
-- The newest entry whose `test` is not true: its `published_at` is the last successful
-  run. If there is none, use the last 24 hours.
+- The newest entry whose `test` is not true AND whose `kind` is not `"saved"`: its
+  `published_at` is the last successful run. (Saved-only briefs, section 0b, never move the
+  newsletter window.) If there is none, use the last 24 hours.
 - Read the newest ~4 briefs (`path` = `briefs/<id>.json`, where `<id>` is the entry's `id`,
   or its `date` for entries without one) and collect every URL in their
   items. These are already-sent links; never send one again.

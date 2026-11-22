@@ -120,6 +120,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .gen { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .gen button { font-family: var(--font-mono); font-size: 0.75rem; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); cursor: pointer; }
 .gen button:disabled { opacity: 0.6; cursor: progress; }
+.gen-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.gen button.alt { background: transparent; color: var(--accent); }
 .gen .gen-msg { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); text-align: right; max-width: 22rem; }
 .gen .gen-msg.err { color: var(--wild); }
 .fix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
@@ -208,7 +210,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   <header class="masthead">
     <h1>AI Audio Digest</h1>
     <div class="gen" id="gen" hidden>
-      <button type="button" id="gen-btn">New brief now</button>
+      <div class="gen-row">
+        <button type="button" id="saved-btn" class="alt">Saved articles now</button>
+        <button type="button" id="gen-btn">New brief now</button>
+      </div>
       <span class="gen-msg" id="gen-msg">New brief daily · 9:30am ET</span>
     </div>
     <span class="sched" id="sched">New brief daily · 9:30am ET</span>
@@ -776,7 +781,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     const head = el("div", "brief-head");
     const wildCount = b.items.filter(i => i.wildcard === true || isWild(i.text)).length;
     const entry = index.find(e => idOf(e) === idOf(b)) || b;
-    head.append(el("span", "eyebrow", index[0] && idOf(index[0]) === idOf(b) ? "Latest brief" : "Brief"));
+    head.append(el("span", "eyebrow", (index[0] && idOf(index[0]) === idOf(b) ? "Latest brief" : "Brief") + ((entry.kind || b.kind) === "saved" ? " · Saved articles only" : "")));
     head.append(el("h2", null, labelOf(entry)));
     const stats = el("div", "stats");
     stats.append(el("span", null, b.items.length + " items" + (wildCount ? " · " + wildCount + " wildcards" : "")));
@@ -960,6 +965,48 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     }
   }
 
+  // Saved articles now: a brief with only Adam's new saved articles (RUNBOOK section 0b).
+  // It does not read newsletters and does not move the daily brief's newsletter window.
+  async function requestSaved() {
+    const btn = $("#saved-btn");
+    btn.disabled = true;
+    genMsg("Starting a saved-articles brief…");
+    const now = new Date();
+    let before = "";
+    try { if (db) { const d = await db.doc("control/saved_now").get(); before = d.exists ? (d.data().at || "") : ""; } } catch (e) {}
+    try {
+      await mcp.callTool("Claude Code Remote", "fire_trigger", {
+        trigger_id: TRIGGER_ID,
+        text: "SAVED ONLY MODE. Adam tapped 'Saved articles now' on the digest page at " + etTime(now) + ". Follow section 0b of RUNBOOK.md: make a brief with ONLY his new saved Apple News articles. Do NOT fetch newsletters, do NOT run discovery, and do not change other briefs."
+      });
+      genMsg("Started at " + etTime(now) + ". Full-article audio takes a while: about 10 to 15 minutes per article.");
+      const known = index.length, started = Date.now();
+      const iv = setInterval(async () => {
+        if (Date.now() - started > 90 * 60 * 1000) { clearInterval(iv); btn.disabled = false; genMsg("Still working or it stalled. Reload later."); return; }
+        try {
+          if (db) {
+            const d = await db.doc("control/saved_now").get();
+            const s = d.exists ? d.data() : null;
+            if (s && s.at && s.at !== before && s.status === "none") { clearInterval(iv); btn.disabled = false; genMsg("No new saved articles. Share one from Apple News first."); return; }
+          }
+          const fresh = await getJSON("briefs/index.json");
+          if (fresh.length > known) {
+            clearInterval(iv); btn.disabled = false;
+            index = fresh.sort((a, b) => b.date.localeCompare(a.date) || seqOf(b) - seqOf(a));
+            renderLog(); show(idOf(index[0]), true);
+            genMsg("Your saved articles are ready.");
+          }
+        } catch (e) {}
+      }, 30000);
+    } catch (e) {
+      btn.disabled = false;
+      const code = e && e.code;
+      if (code === "not_in_manifest" || code === "not_granted" || code === "consent_required") genMsg("The page needs your permission to start runs. Tap again and choose Allow.", true);
+      else if (code === "server_not_connected" || code === "selection_required" || code === "needs_reauth") genMsg("Reconnect Claude Code Remote in claude.ai Settings, Connectors.", true);
+      else genMsg("Couldn't start it (" + (code || "error") + "). Try again later.", true);
+    }
+  }
+
   async function requestBrief() {
     const btn = $("#gen-btn");
     btn.disabled = true;
@@ -999,6 +1046,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     $("#gen").hidden = false;
     $("#sched").hidden = true;
     $("#gen-btn").addEventListener("click", requestBrief);
+    $("#saved-btn").addEventListener("click", requestSaved);
     document.querySelectorAll("[data-fix]").forEach(n => { n.hidden = false; });
   })();
 
@@ -1102,7 +1150,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       const li = el("li");
       const a = el("a");
       a.href = "#d" + idOf(e); a.dataset.id = idOf(e);
-      a.append(el("span", "log-date", labelOf(e)), el("span", "log-sum", e.summary || ""), el("span", "log-n", (e.items || 0) + " items"));
+      a.append(el("span", "log-date", labelOf(e)), el("span", "log-sum", e.summary || ""), el("span", "log-n", (e.items || 0) + (e.kind === "saved" ? " saved" : " items")));
       a.addEventListener("click", (ev) => { ev.preventDefault(); show(idOf(e), true); });
       li.append(a); list.append(li);
     });

@@ -190,6 +190,12 @@ def write_site(d, out, dropbox="", existing="", words_path=""):
     index = [e for e in index if (e.get("id") or e["date"]) != bid]
     entry = {"id": bid, "date": date, "items": len(d["items"]), "summary": " ".join(summary.split())[:160],
              "published_at": now, "test": bool(d.get("test"))}
+    if d.get("kind"):
+        # "saved": a saved-articles-only brief. It does not count as a newsletter run, so the
+        # next scheduled brief's window still starts at the last full brief (RUNBOOK step 1).
+        entry["kind"] = d["kind"]
+    if prior and prior.get("kind") and "kind" not in entry:
+        entry["kind"] = prior["kind"]
     if prior and prior.get("published_at"):
         # A repair re-publishes an existing brief: keep its original publish time so the
         # next scheduled run's window (which starts at the newest published_at) is unchanged.
