@@ -512,14 +512,15 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     try { const d = await db.doc("control/playback").get(); if (d.exists) setSpeed(parseFloat(d.data().speed), false); } catch (e) {}
   })();
 
-  function renderPlayer(b) {
+  function renderPlayer(b, pre) {
     const box = el("section", "player");
     box.setAttribute("aria-label", "Audio");
     const src = b.audio && b.audio.src;
     if (!src) {
       box.append(el("p", "audio-missing", b.audio && b.audio.note ? b.audio.note : "No audio for this brief."));
     } else {
-      const audio = new Audio();
+      // `pre` is an audio element already started inside a tap (see primeAudio), so it may play on its own.
+      const audio = pre || new Audio();
       audio.preload = "metadata";
       const rev = b.audio.rev || (index.find(e => idOf(e) === idOf(b)) || {}).repaired_at || "";
       audio.src = rev ? src + "?v=" + encodeURIComponent(rev) : src;
@@ -748,7 +749,17 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     return row;
   }
 
-  async function renderArticle(brief, n, item, btn) {
+  // iPhone only lets audio start from a tap. The full article loads after the tap, so the tap
+  // starts a silent clip on a fresh audio element; the article's player then reuses that
+  // element, and its play() is allowed.
+  const SILENT = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+  function primeAudio() {
+    const a = new Audio(SILENT);
+    try { const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+    return a;
+  }
+
+  async function renderArticle(brief, n, item, btn, primed) {
     if (btn) { btn.disabled = true; btn.querySelector("span").textContent = "Loading the article…"; }
     let doc;
     try { doc = await getJSON(item.full.src); }
@@ -774,24 +785,25 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     const sentinel = el("div", "player-sentinel");
     head.append(sentinel);
     const vers = el("div", "vers");
-    function play(v) {
+    function play(v, pre, autoplay) {
       stopSync(); currentAudio = null;
       vers.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.src === v.src ? "true" : "false"));
       const pseudo = { kind: "article", paras: (doc.paragraphs || []).length, items: [], timing: v.timing,
         audio: { src: v.src, voice: v.voice, label: versionLabel(v) } };
-      const box = renderPlayer(pseudo);
+      const box = renderPlayer(pseudo, pre);
       holder.replaceChildren(box);
       if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => box.classList.toggle("stuck", !e.isIntersecting && e.boundingClientRect.top < 0)).observe(sentinel);
       wireSync(pseudo, tr);
+      if (autoplay && currentAudio) { const pp = currentAudio.play(); if (pp && pp.catch) pp.catch(() => {}); }
     }
     if (versions.length > 1) {
-      versions.forEach((v) => { const vb = el("button", null, versionLabel(v)); vb.type = "button"; vb.dataset.src = v.src; vb.addEventListener("click", () => play(v)); vers.append(vb); });
+      versions.forEach((v) => { const vb = el("button", null, versionLabel(v)); vb.type = "button"; vb.dataset.src = v.src; vb.addEventListener("click", () => play(v, primeAudio(), true)); vers.append(vb); });
       head.append(el("span", "full-meta", versions.some(v => v.sample) ? "Compare: the ElevenLabs version is a sample of the first minute or so." : "Two versions to compare. Pick one:"), vers);
     }
     notes.forEach(v => head.append(el("span", "full-meta", (v.kind === "elevenlabs" ? "ElevenLabs: " : "") + v.note)));
     frag.append(head, holder, tr);
     main.replaceChildren(frag);
-    if (versions.length) play(versions[0]);
+    if (versions.length) play(versions[0], primed, !!primed);
     else holder.replaceChildren(el("p", "audio-missing", "No audio for this article."));
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -833,7 +845,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       if (item.full && item.full.src) {
         const fb = el("button", "full-btn"); fb.type = "button"; fb.id = "full-" + (item.saved || n);
         fb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><span>Listen to the full article</span>';
-        fb.addEventListener("click", () => renderArticle(b, n, item, fb));
+        fb.addEventListener("click", () => renderArticle(b, n, item, fb, primeAudio()));
         body.append(fb);
         const vs = (item.full.versions || []).filter(v => !v.note);
         const mins = vs[0] && vs[0].seconds ? Math.max(1, Math.round(vs[0].seconds / 60)) + " min · " : "";
