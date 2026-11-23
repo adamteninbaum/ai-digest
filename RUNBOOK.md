@@ -56,10 +56,11 @@ discovery or WebSearch, do not read votes or topics, and do not change other bri
   here are the articles you saved.", the saved items only, a short `outro`, `headline` naming
   them, `footer` "Saved articles only. Newsletters come in the next daily brief." Get `id`
   with `nextid` as usual. No media (skip step 6b).
-- Steps 7 and 8 as usual (brief audio, publish, both alerts; for notify.py use the article
-  titles as the summary). Then set the same `control/saved_now` doc to `{"status": "done",
+- Steps 7 and 8 as usual (brief audio, publish; alerts held for step 8d; for notify.py use
+  the article titles as the summary). Then set the same `control/saved_now` doc to `{"status": "done",
   "id": "<id>", "at": "<UTC now>"}`. The brief is now on the page.
-- Then steps 8b (full-article audio) and 8c (share links), each added afterward with another publish.
+- Then steps 8b (full-article audio) and 8c (share links), each added afterward with another
+  publish, then 8d (the alerts, once both are on the page).
 - Finish with "Saved-only brief <id>: <n> articles" plus audio status and credits used.
 
 ## 1. Work out the window (state lives on the digest page, no state files)
@@ -267,6 +268,10 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   and leave the MP3 out of `files`.
 - Check it: `Artifact` action `list`, `scope` = `files`, `url` = the page; the new brief
   JSON and MP3 must be listed.
+- HOLD THE ALERTS when step 2c found new saved articles: do not send the PushNotification or
+  the ntfy alert here. Do steps 8b and 8c first, then send both in step 8d, so when Adam opens
+  the page the full-article audio and the "Share with friends & family" link are already
+  there. With no new saved articles, send them now as below.
 - Phone alert: Adam gets alerts in the Claude iPhone app. Once the publish is confirmed,
   load the `PushNotification` tool (ToolSearch `select:PushNotification`) and send one
   line under 200 characters, e.g. "AI digest ready: <top story> + <n-1> more. Open the
@@ -283,11 +288,11 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   adamshawn0102@gmail.com, subject `AI Audio Digest - YYYY-MM-DD (page publish failed)`,
   `htmlBody` = email.html, `body` = email.txt, verbatim.
 
-Then do steps 8b and 8c if step 2c found new saved articles.
+Then do steps 8b, 8c and 8d if step 2c found new saved articles.
 
 ## 8b. Full-article audio for saved articles (AFTER step 8; only if step 2c found new ones)
-The brief is already published and the alerts sent. This adds the "Listen to the full article"
-button afterward, so the slow full-article audio never holds up the brief.
+The brief is already published; its alerts are held until step 8d. This adds the "Listen to
+the full article" button.
 - Full-article voice: `ArtifactData` action `get`, `url` = the page, `collection` =
   `control`, `doc_id` = `article_voice`. Its `mode` is `default` (Adam's brief voice, free),
   `elevenlabs` (ElevenLabs instead), `both` (both, to compare) or `sample` (brief voice for
@@ -327,6 +332,16 @@ shows the button when an item has
 - Then publish once more exactly as in step 8b (`briefs/<id>.json` only is enough). No alerts.
 - If it fails (Dropbox keys, network), the brief stays as it is; say so in the step 9 summary.
   Never drop a share link that is already on an item.
+
+## 8d. Send the held alerts (AFTER step 8c; only when the alerts were held in step 8)
+- Confirm it is all on the page: `Artifact` action `read`, `url` = the page, `path` =
+  `briefs/<id>.json`. Every item with `"origin": "saved"` must have `full.versions` with a
+  `src` and a `full.share` link, and `Artifact` action `list`, `scope` = `files` must show each
+  of those `audio/full-...mp3` files. If something is missing, fix it (rerun 8b or 8c and
+  publish again) before alerting.
+- Then send the alerts exactly as in step 8 (PushNotification and the REQUIRED ntfy alert).
+- Never skip the alerts: if 8b or 8c still fails after one retry, send them anyway and say in
+  the summary which saved articles are missing full audio or a share link.
 
 ## 9. Finish
 This summary is what Adam's phone alert shows, so its first line must be "AI digest
