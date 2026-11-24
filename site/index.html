@@ -217,9 +217,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
         <button type="button" id="saved-btn" class="alt">Saved articles now</button>
         <button type="button" id="gen-btn">New brief now</button>
       </div>
-      <span class="gen-msg" id="gen-msg">New brief daily · 9:30am ET</span>
+      <span class="gen-msg" id="gen-msg">New brief daily · 8am ET</span>
     </div>
-    <span class="sched" id="sched">New brief daily · 9:30am ET</span>
+    <span class="sched" id="sched">New brief daily · 8am ET</span>
   </header>
 
   <nav class="views" id="views" hidden aria-label="Views">
@@ -587,6 +587,18 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       audio.addEventListener("loadedmetadata", () => { dur.textContent = fmtTime(audio.duration); const rt = $("#runtime"); if (rt) rt.textContent = fmtTime(audio.duration) + " runtime"; });
       audio.addEventListener("timeupdate", () => { cur.textContent = fmtTime(audio.currentTime); if (audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + "%"; });
       audio.addEventListener("error", () => { dur.textContent = "unavailable"; });
+      // Finished (90% played): record it so the run can clear it from the offline Dropbox folder.
+      const listenKey = b.kind === "article" ? b.listenKey : (b.id || b.date);
+      let listened = false;
+      const markListened = () => {
+        if (listened || !db || !listenKey || !audio.duration || audio.currentTime / audio.duration < 0.9) return;
+        listened = true;
+        db.collection("listened").doc(String(listenKey).replace(/[^A-Za-z0-9_.~:@+-]/g, "_"))
+          .set({ at: new Date().toISOString(), kind: b.kind === "article" ? "article" : "brief" })
+          .catch(() => { listened = false; });
+      };
+      audio.addEventListener("timeupdate", markListened);
+      audio.addEventListener("ended", markListened);
       const seek = (x) => { const r = bar.getBoundingClientRect(); if (audio.duration) audio.currentTime = Math.min(1, Math.max(0, (x - r.left) / r.width)) * audio.duration; };
       bar.addEventListener("click", (e) => seek(e.clientX));
       bar.addEventListener("keydown", (e) => {
@@ -788,7 +800,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     function play(v, pre, autoplay) {
       stopSync(); currentAudio = null;
       vers.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x.dataset.src === v.src ? "true" : "false"));
-      const pseudo = { kind: "article", paras: (doc.paragraphs || []).length, items: [], timing: v.timing,
+      const pseudo = { kind: "article", listenKey: "full-" + (item.saved || ""), paras: (doc.paragraphs || []).length, items: [], timing: v.timing,
         audio: { src: v.src, voice: v.voice, label: versionLabel(v) } };
       const box = renderPlayer(pseudo, pre);
       holder.replaceChildren(box);

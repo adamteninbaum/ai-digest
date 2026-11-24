@@ -243,8 +243,8 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
   Microsoft refuses it falls back to the local Kokoro voice automatically and prints
   `engine: kokoro`. Say which engine was used in the step 9 summary). It also writes `AI-Audio-Digest-<id>.words.json`, the timing of
   every spoken word, which the page uses to highlight words as they are read.
-- Do NOT upload to Dropbox. Adam no longer wants Dropbox copies; the MP3 lives only on
-  the digest page (step 8).
+- No Dropbox share link for the brief MP3 itself. Its only Dropbox copy is the offline folder
+  (step 8, "Offline copy").
 - tts.py prints `voice_used: <id>` (the voice actually spoken, e.g. `am_michael` when
   Andrew fell back). Put it in digest.json as `"voice": "<id>"`, and set `"audio_rev"`
   to the current UTC time (e.g. `"2026-10-13T03:01:00Z"`) so phones fetch the new file
@@ -268,6 +268,19 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   and leave the MP3 out of `files`.
 - Check it: `Artifact` action `list`, `scope` = `files`, `url` = the page; the new brief
   JSON and MP3 must be listed.
+- Offline copy (every run, scheduled or on-demand, saved-only too): Adam listens offline in the
+  Dropbox app. `ArtifactData` action `list`, `url` = the page, `collection` = `listened` (page
+  through all); write the doc ids as a JSON array to `listened.json` (`[]` if empty or the read
+  fails). Then `python3 offline.py add out/briefs/<id>.json <the MP3 path>` and
+  `python3 offline.py prune listened.json`. It copies the brief audio and a transcript with
+  every link to `/Claude/AI Digest Offline/` and moves listened or old briefs to
+  `/Claude/AI Digest Archive/`. If it fails, carry on and say so in the step 9 summary.
+- Alert time: the scheduled run starts before 7am ET but Adam wants no alert before 8am ET.
+  On the SCHEDULED run (no extra message after the Routine prompt: no "New brief now", no
+  "SAVED ONLY MODE", no repair request), pass `--not-before 08:00` to notify.py (ntfy holds the alert and
+  delivers it at 8:00 ET; after 8 it goes out at once), and skip the PushNotification if it is
+  still before 8:00 ET (it cannot be held). On-demand runs ("New brief now", "Saved articles
+  now", repairs) alert right away as before.
 - HOLD THE ALERTS when step 2c found new saved articles: do not send the PushNotification or
   the ntfy alert here. Do steps 8b and 8c first, then send both in step 8d, so when Adam opens
   the page the full-article audio and the "Share with friends & family" link are already
@@ -279,8 +292,8 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
   fires when the run ends, and it shows the step 9 summary.
 - REQUIRED on every run, scheduled or on-demand ("New brief now"): send the ntfy alert
   (a banner that opens this brief directly when tapped):
-  `python3 notify.py <id> "<the top 2 stories in plain words>" <item count>`. It must print
-  `sent <id>`. If it fails, retry once. Never skip it, even for a short or on-demand brief.
+  `python3 notify.py [--not-before 08:00] <id> "<the top 2 stories in plain words>" <item count>`
+  (the flag on scheduled runs only, see "Alert time"). It must print `sent <id>`. If it fails, retry once. Never skip it, even for a short or on-demand brief.
 - Also send the PushNotification above. If either alert fails, note it in the step 9
   summary and carry on.
 - Only if publishing fails: fall back to email. Run `python3 build_digest.py email
@@ -332,6 +345,8 @@ shows the button when an item has
 - Then publish once more exactly as in step 8b (`briefs/<id>.json` only is enough). No alerts.
 - If it fails (Dropbox keys, network), the brief stays as it is; say so in the step 9 summary.
   Never drop a share link that is already on an item.
+- Run `python3 offline.py add out/briefs/<id>.json <the brief MP3 path>` again so the offline
+  folder also gets each saved article's full audio and text.
 
 ## 8d. Send the held alerts (AFTER step 8c; only when the alerts were held in step 8)
 - Confirm it is all on the page: `Artifact` action `read`, `url` = the page, `path` =
@@ -339,7 +354,8 @@ shows the button when an item has
   `src` and a `full.share` link, and `Artifact` action `list`, `scope` = `files` must show each
   of those `audio/full-...mp3` files. If something is missing, fix it (rerun 8b or 8c and
   publish again) before alerting.
-- Then send the alerts exactly as in step 8 (PushNotification and the REQUIRED ntfy alert).
+- Then send the alerts exactly as in step 8 (PushNotification and the REQUIRED ntfy alert,
+  with the same "Alert time" rule).
 - Never skip the alerts: if 8b or 8c still fails after one retry, send them anyway and say in
   the summary which saved articles are missing full audio or a share link.
 
