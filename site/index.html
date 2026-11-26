@@ -14,6 +14,8 @@
   --accent-soft: #dcefeb;
   --wild: #8a4b0f;
   --wild-soft: #f6e9da;
+  --saved: #6b3f8f;
+  --saved-soft: #f1e8f7;
   --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --font-body: "Literata", Georgia, "Times New Roman", serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -22,12 +24,14 @@
   :root:not([data-theme="light"]) {
     --bg: #0f1514; --surface: #161e1c; --ink: #e2e9e6; --muted: #92a19c; --line: #26312e;
     --accent: #5cc6b8; --accent-soft: #173330; --wild: #e0a569; --wild-soft: #33261a;
+    --saved: #c9a2ea; --saved-soft: #281f33;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f1514; --surface: #161e1c; --ink: #e2e9e6; --muted: #92a19c; --line: #26312e;
   --accent: #5cc6b8; --accent-soft: #173330; --wild: #e0a569; --wild-soft: #33261a;
+    --saved: #c9a2ea; --saved-soft: #281f33;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -165,7 +169,24 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .origin { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
 .origin.gmail { color: var(--accent); border-color: var(--accent); }
 .origin.web { color: var(--ink); }
-.origin.saved { color: var(--surface); background: var(--wild); border-color: var(--wild); }
+.origin.saved { color: var(--surface); background: var(--saved); border-color: var(--saved); }
+/* Saved articles (Apple News) get their own color, apart from the digest's newsletter and web items. */
+.seg.saved { background: var(--saved-soft); border-radius: 10px; padding-inline: 10px; border-top-color: transparent; }
+.seg.saved .seg-no { color: var(--saved); }
+.seg.saved .full-btn { background: var(--saved); border-color: var(--saved); color: var(--surface); }
+.eyebrow.saved { color: var(--saved); }
+.log li a.saved-entry { background: var(--saved-soft); }
+.log-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 12px; margin-bottom: 8px; }
+.log-head h3 { margin: 0; }
+.log-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.log-filter button { font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.log-filter button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.log-filter button.f-saved { color: var(--saved); border-color: var(--saved); }
+.log-filter button.f-saved[aria-pressed="true"] { background: var(--saved); border-color: var(--saved); color: var(--surface); }
+.log-empty { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); margin: 10px 0 0; }
+.log li a.saved-entry .log-n { color: var(--saved); }
+.log li a.saved-entry[aria-current="true"] { background: var(--saved-soft); outline: 1px solid var(--saved); outline-offset: -1px; }
+.log li a.saved-entry .log-date::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--saved); margin-right: 6px; vertical-align: 1px; }
 .seg-title { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; line-height: 1.25; margin: 0; }
 .full-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 0.78rem; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); cursor: pointer; }
 .full-btn svg { width: 14px; height: 14px; fill: currentColor; }
@@ -270,8 +291,16 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   </details>
 
   <section class="log" id="log" hidden>
-    <h3>All briefs</h3>
+    <div class="log-head">
+      <h3>All briefs</h3>
+      <div class="log-filter" role="group" aria-label="Show">
+        <button type="button" id="filter-all" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" id="filter-daily" data-filter="daily" aria-pressed="false">Digests</button>
+        <button type="button" id="filter-saved" data-filter="saved" class="f-saved" aria-pressed="false">Saved articles</button>
+      </div>
+    </div>
     <ol id="log-list"></ol>
+    <p class="log-empty" id="log-empty" hidden></p>
   </section>
 </div>
 
@@ -782,7 +811,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     const head = el("div", "brief-head");
     const back = el("button", "back", "← Back to the brief"); back.type = "button"; back.id = "article-back";
     back.addEventListener("click", () => openItem(idOf(brief), n + 1));
-    head.append(back, el("span", "eyebrow", "Saved by Adam · Full article"), el("h2", null, doc.title || item.title || "Saved article"));
+    head.append(back, el("span", "eyebrow saved", "Saved by Adam · Full article"), el("h2", null, doc.title || item.title || "Saved article"));
     const stats = el("div", "stats");
     [doc.source, doc.author ? "by " + doc.author : "", doc.date, (doc.words || 0).toLocaleString() + " words"].filter(Boolean).forEach(t => stats.append(el("span", null, t)));
     head.append(stats);
@@ -831,7 +860,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     const head = el("div", "brief-head");
     const wildCount = b.items.filter(i => i.wildcard === true || isWild(i.text)).length;
     const entry = index.find(e => idOf(e) === idOf(b)) || b;
-    head.append(el("span", "eyebrow", (index[0] && idOf(index[0]) === idOf(b) ? "Latest brief" : "Brief") + ((entry.kind || b.kind) === "saved" ? " · Saved articles only" : "")));
+    head.append(el("span", "eyebrow" + ((entry.kind || b.kind) === "saved" ? " saved" : ""), (index[0] && idOf(index[0]) === idOf(b) ? "Latest brief" : "Brief") + ((entry.kind || b.kind) === "saved" ? " · Saved articles only" : "")));
     head.append(el("h2", null, labelOf(entry)));
     const stats = el("div", "stats");
     stats.append(el("span", null, b.items.length + " items" + (wildCount ? " · " + wildCount + " wildcards" : "")));
@@ -847,7 +876,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     if (b.intro) tr.append(wordsInto(el("p", "say"), b.intro, 0));
     b.items.forEach((item, n) => {
       const wild = item.wildcard === true || isWild(item.text);
-      const seg = el("article", "seg" + (wild ? " wild" : ""));
+      const seg = el("article", "seg" + (wild ? " wild" : "") + (item.origin === "saved" ? " saved" : ""));
       seg.append(el("span", "seg-no", String(n + 1).padStart(2, "0")));
       const body = el("div", "seg-body");
       if (wild) body.append(el("span", "tag", "Wildcard"));
@@ -1242,14 +1271,31 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     }));
   })();
 
+  // "All briefs" filter: All, Digests (the daily and on-demand newsletter briefs) or Saved articles
+  // (saved-only briefs, plus digests that carry saved articles). Remembered on this device.
+  let logFilter = "all";
+  try { logFilter = localStorage.getItem("logFilter") || "all"; } catch (e) {}
+  const isSavedEntry = (e) => e.kind === "saved" || (e.saved || 0) > 0;
+  document.querySelectorAll(".log-filter button").forEach((b) => b.addEventListener("click", () => {
+    logFilter = b.dataset.filter;
+    try { localStorage.setItem("logFilter", logFilter); } catch (e) {}
+    renderLog();
+  }));
+
   function renderLog() {
     const list = $("#log-list");
     list.replaceChildren();
-    index.forEach((e) => {
+    document.querySelectorAll(".log-filter button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.filter === logFilter ? "true" : "false"));
+    const shown = index.filter((e) => logFilter === "all" || (logFilter === "saved" ? isSavedEntry(e) : e.kind !== "saved"));
+    const empty = $("#log-empty");
+    empty.hidden = shown.length > 0;
+    empty.textContent = logFilter === "saved" ? "No saved articles yet. Share one from Apple News." : "No digests yet.";
+    shown.forEach((e) => {
       const li = el("li");
       const a = el("a");
       a.href = "#d" + idOf(e); a.dataset.id = idOf(e);
-      a.append(el("span", "log-date", labelOf(e)), el("span", "log-sum", e.summary || ""), el("span", "log-n", (e.items || 0) + (e.kind === "saved" ? " saved" : " items")));
+      if (isSavedEntry(e)) a.classList.add("saved-entry");
+      a.append(el("span", "log-date", labelOf(e)), el("span", "log-sum", e.summary || ""), el("span", "log-n", (e.items || 0) + (e.kind === "saved" ? " saved" : " items" + (e.saved ? " · " + e.saved + " saved" : ""))));
       a.addEventListener("click", (ev) => { ev.preventDefault(); show(idOf(e), true); });
       li.append(a); list.append(li);
     });

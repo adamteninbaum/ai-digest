@@ -190,6 +190,9 @@ def write_site(d, out, dropbox="", existing="", words_path=""):
     index = [e for e in index if (e.get("id") or e["date"]) != bid]
     entry = {"id": bid, "date": date, "items": len(d["items"]), "summary": " ".join(summary.split())[:160],
              "published_at": now, "test": bool(d.get("test"))}
+    n_saved = sum(1 for i in d["items"] if i.get("origin") == "saved")
+    if n_saved:
+        entry["saved"] = n_saved  # saved Apple News articles in this brief (the page's "Saved articles" filter)
     if d.get("kind"):
         # "saved": a saved-articles-only brief. It does not count as a newsletter run, so the
         # next scheduled brief's window still starts at the last full brief (RUNBOOK step 1).
