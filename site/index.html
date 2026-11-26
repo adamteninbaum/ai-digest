@@ -104,6 +104,13 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .flag-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .flag-actions button { font-family: var(--font-mono); font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
 .flag-actions button.open { border-color: var(--accent); color: var(--accent); }
+.views button.v-saved { color: var(--saved); border-color: var(--saved); }
+.views button.v-saved[aria-pressed="true"] { background: var(--saved); border-color: var(--saved); color: var(--surface); }
+.saved-card { background: var(--saved-soft); border-radius: 10px; border-top: 0; padding: 14px; }
+.saved-card + .saved-card { margin-top: 8px; }
+.saved-card h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; line-height: 1.25; margin: 0; }
+.saved-card .flag-meta { color: var(--saved); }
+.saved-card .flag-actions button.listen { background: var(--saved); border-color: var(--saved); color: var(--surface); }
 .seg.flash { animation: flash 1.6s ease-out; }
 @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
 .vote button { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
@@ -246,6 +253,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   <nav class="views" id="views" hidden aria-label="Views">
     <button type="button" id="view-briefs" aria-pressed="true">Briefs</button>
     <button type="button" id="view-flagged" aria-pressed="false">Flagged <span id="flag-count"></span></button>
+    <button type="button" id="view-saved" class="v-saved" aria-pressed="false">Saved articles</button>
     <button type="button" id="view-topics" aria-expanded="false" aria-controls="interests">More of this <span id="topic-count"></span></button>
   </nav>
 
@@ -387,6 +395,70 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     viewing = v;
     $("#view-briefs").setAttribute("aria-pressed", v === "briefs" ? "true" : "false");
     $("#view-flagged").setAttribute("aria-pressed", v === "flagged" ? "true" : "false");
+    $("#view-saved").setAttribute("aria-pressed", v === "saved" ? "true" : "false");
+  }
+
+  // Every saved Apple News article, newest first, across all briefs. saved/used.json lists them
+  // all; the briefs that carry them give the title, blurb and full-article audio.
+  const SAVED_SINCE = "2026-11-22";
+  async function renderSaved() {
+    setView("saved");
+    stopSync(); currentAudio = null; currentBrief = null;
+    const main = $("#brief");
+    const wrap = el("div"); wrap.style.display = "flex"; wrap.style.flexDirection = "column"; wrap.style.gap = "8px";
+    const head = el("div", "brief-head");
+    head.append(el("span", "eyebrow saved", "Saved by Adam"), el("h2", null, "Saved articles"));
+    const stats = el("div", "stats", "Loading…");
+    head.append(stats); wrap.append(head);
+    main.replaceChildren(wrap);
+    document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", "false"));
+    let used = [];
+    try { used = await getJSON("saved/used.json"); } catch (e) {}
+    const found = new Map();
+    const cands = index.filter(e => e.kind === "saved" || (e.saved || 0) > 0 || (e.date || "") >= SAVED_SINCE);
+    await Promise.all(cands.map(async (e) => {
+      try {
+        const b = await getJSON("briefs/" + idOf(e) + ".json");
+        b.items.forEach((it, n) => {
+          if (!it.saved) return;
+          const prev = found.get(it.saved);
+          // Prefer the brief that has the full-article audio (the newest one if several do).
+          if (!prev || (!prev.item.full && it.full) || (!!prev.item.full === !!it.full && (b.id || b.date) > (prev.brief.id || prev.brief.date))) found.set(it.saved, { brief: b, n, item: it, entry: e });
+        });
+      } catch (err) {}
+    }));
+    if (viewing !== "saved") return;
+    const order = used.map(u => u.key).reverse();
+    [...found.keys()].forEach(k => { if (!order.includes(k)) order.unshift(k); });
+    const rows = order.map(k => ({ key: k, u: used.find(x => x.key === k) || {}, f: found.get(k) }));
+    rows.sort((a, b) => ((b.f && (b.f.brief.id || b.f.brief.date)) || "").localeCompare((a.f && (a.f.brief.id || a.f.brief.date)) || ""));
+    stats.textContent = rows.length + (rows.length === 1 ? " article" : " articles") + " · newest first";
+    if (!rows.length) wrap.append(el("div", "empty", "No saved articles yet. Share one from Apple News with the News To Mac shortcut."));
+    rows.forEach(({ key, u, f }) => {
+      const card = el("article", "flag-card saved-card");
+      const item = f ? f.item : null;
+      const title = (item && item.title) || u.title || "Saved article";
+      card.append(el("span", "flag-meta", [f ? labelOf(f.entry) : "", item && item.source].filter(Boolean).join(" · ") || "Not in a brief yet"));
+      card.append(el("h3", null, title));
+      if (item && item.text) card.append(el("p", null, item.text.replace(/^From your saved articles:\s*/i, "").slice(0, 220) + (item.text.length > 220 ? "…" : "")));
+      const act = el("div", "flag-actions");
+      if (item && item.full && item.full.src) {
+        const vs = (item.full.versions || []).filter(v => !v.note);
+        const mins = vs[0] && vs[0].seconds ? " (" + Math.max(1, Math.round(vs[0].seconds / 60)) + " min)" : "";
+        const listen = el("button", "listen", "Listen to the full article" + mins); listen.type = "button";
+        listen.addEventListener("click", () => renderArticle(f.brief, f.n, item, null, primeAudio()));
+        act.append(listen);
+      }
+      if (f) {
+        const open = el("button", "open", "Open in brief"); open.type = "button";
+        open.addEventListener("click", () => openItem(idOf(f.brief), f.n + 1));
+        act.append(open);
+      }
+      const link = (item && (item.urls || []).map(x => typeof x === "string" ? x : x.url)[0]) || u.link;
+      if (link) { const a = el("a", "dropbox", "Original"); a.href = link; a.target = "_blank"; a.rel = "noopener"; act.append(a); }
+      card.append(act);
+      wrap.append(card);
+    });
   }
 
   function renderFlagged() {
@@ -1320,6 +1392,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     if (!box.hidden) $("#interest-input").focus();
   });
   $("#view-flagged").addEventListener("click", () => { renderFlagged(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  $("#view-saved").addEventListener("click", () => { renderSaved(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   $("#view-briefs").addEventListener("click", () => { if (index[0]) show(idOf(index[0]), true); });
 
   async function start() {
