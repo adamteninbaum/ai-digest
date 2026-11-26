@@ -336,7 +336,28 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       fb.textContent = on ? "Follow text" : "Follow text: off";
       fb.title = note || "";
     }
+    syncWake();
   }
+
+  // Keep the phone's screen on (no dimming or auto-lock) while audio plays with Follow text on.
+  // The browser drops the lock when the page is hidden; it is asked for again when it is shown.
+  let wakeLock = null, wakeBusy = false, wakeAgain = false;
+  const wantWake = () => !!(currentAudio && !currentAudio.paused && !currentAudio.ended && followText && document.visibilityState === "visible");
+  async function syncWake() {
+    if (wakeBusy) { wakeAgain = true; return; }
+    const want = wantWake();
+    wakeBusy = true;
+    try {
+      if (want && !wakeLock && navigator.wakeLock) {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+      } else if (!want && wakeLock) {
+        const w = wakeLock; wakeLock = null; await w.release();
+      }
+    } catch (e) { wakeLock = null; } finally { wakeBusy = false; }
+    if (wakeAgain) { wakeAgain = false; syncWake(); }
+  }
+  document.addEventListener("visibilitychange", syncWake);
   // Scrolling by hand while the audio plays turns Follow text off; tap the button to turn it back on.
   const manualScroll = () => { if (followText && currentAudio && !currentAudio.paused) setFollow(false, "Turned off because you scrolled. Tap to follow again."); };
   window.addEventListener("wheel", manualScroll, { passive: true });
@@ -700,6 +721,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       };
       audio.addEventListener("timeupdate", markListened);
       audio.addEventListener("ended", markListened);
+      ["play", "playing", "pause", "ended"].forEach((ev) => audio.addEventListener(ev, () => setTimeout(syncWake, 0)));
       const seek = (x) => { const r = bar.getBoundingClientRect(); if (audio.duration) audio.currentTime = Math.min(1, Math.max(0, (x - r.left) / r.width)) * audio.duration; };
       bar.addEventListener("click", (e) => seek(e.clientX));
       bar.addEventListener("keydown", (e) => {
