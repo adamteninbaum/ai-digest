@@ -968,6 +968,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
       v.src = m.src; v.controls = true; v.playsInline = true; v.preload = "metadata";
       if (m.poster) v.poster = m.poster;
       v.addEventListener("play", () => { if (currentAudio && !currentAudio.paused) currentAudio.pause(); });
+      // Videos from older briefs are removed to keep the page under its storage cap: hide the gap.
+      v.addEventListener("error", () => fig.remove());
       fig.append(v);
     } else if (m.type === "link" && m.poster) {
       const a = el("a", "media-link"); a.href = m.url; a.target = "_blank"; a.rel = "noopener";
