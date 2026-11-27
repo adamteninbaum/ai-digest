@@ -124,6 +124,26 @@ def parse(text):
     return meta, paras
 
 
+# Apple News menus and screens the Mac sometimes captures instead of the story (for example
+# when a notifications prompt or the Library sidebar covers the article).
+APP_CHROME = ("saved stories", "saved recipes", "shared with you", "history", "favorites", "sections",
+              "keep up with your news", "get notifications about important stories", "not now", "library")
+
+
+def bad_capture(meta, paras):
+    """A reason string when the capture is not a real article, else ''."""
+    words = sum(len(p.split()) for p in paras)
+    title = (meta.get("title") or "").strip().lower()
+    chrome = sum(1 for p in paras if p.strip().lower().strip(".:") in APP_CHROME)
+    if title.startswith("news+") or title in ("apple news", "untitled"):
+        return f"title is Apple News screen text ({meta.get('title')!r})"
+    if chrome >= 3:
+        return f"looks like Apple News menus, not an article ({chrome} menu lines)"
+    if words < 120:
+        return f"too short to be the article ({words} words)"
+    return ""
+
+
 def key_for(meta, file_id, content):
     base = file_id or meta.get("link") or content[:200]
     return "s" + hashlib.sha1(base.encode("utf-8")).hexdigest()[:10]
@@ -206,6 +226,11 @@ def cmd_fetch(used_path, links_path=""):
         if not paras:
             print(f"skip {e['name']}: no body text", file=sys.stderr)
             continue
+        why = bad_capture(meta, paras)
+        if why:
+            # Not marked used: if the Mac re-captures it properly, the new file comes through.
+            print(f"BAD_CAPTURE {e['name']}: {why} ({meta.get('link', '')})")
+            continue
         a = article(meta, paras, e["id"], e.get("content_hash", ""), e["name"], raw)
         if is_used(used, a) or norm_link(a["link"]) in seen:
             continue
@@ -220,7 +245,10 @@ def cmd_parse(paths, used_path=""):
     for p in paths:
         raw = open(p, encoding="utf-8").read()
         meta, paras = parse(raw)
-        if paras:
+        why = bad_capture(meta, paras) if paras else "no body text"
+        if why:
+            print(f"BAD_CAPTURE {os.path.basename(p)}: {why} ({meta.get('link', '')})")
+        elif paras:
             a = article(meta, paras, "", hashlib.sha256(raw.encode()).hexdigest(), os.path.basename(p), raw)
             if not is_used(used, a):
                 arts.append(a)

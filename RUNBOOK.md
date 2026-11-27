@@ -127,7 +127,9 @@ EVERY new one becomes a story in this brief, on top of the 4 to 7 picks. Never u
   - If the Dropbox API itself fails (no keys, network): use the connector `list_folder` on
     `/Claude/news-capture/articles` (recursive false), then `download_link` on every `.txt`
     entry, and run the same `fetch <USED> saved/links.json`. The script still skips used ones.
-- It writes `saved/new.json` and prints one line per new article. None new: skip the rest
+- It writes `saved/new.json` and prints one line per new article. A `BAD_CAPTURE <file>: <why>`
+  line means the Mac saved Apple News menus instead of the story: it is left out (never make a
+  story from it); name it in the step 9 summary so Adam can share that article again. None new: skip the rest
   of this step and of step 8b.
 - Clean each new article before anything else uses it. `saved.py` already strips the usual
   Apple News clutter (clean_article.py), but read every article's `paragraphs` in
