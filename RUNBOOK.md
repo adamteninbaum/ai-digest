@@ -258,6 +258,12 @@ Adam does not want email: the Gmail connector wraps every link in a Google redir
 - `python3 build_digest.py site digest.json out "" "<local path of the
   briefs/index.json you read in step 1>" AI-Audio-Digest-<id>.words.json` writes
   `out/briefs/<id>.json` (with word timings) and a merged `out/briefs/index.json`.
+- Storage cap (Adam approved, 2026-11-27): the page holds at most 256 MiB of files and a
+  publish over it is refused. Before publishing, `Artifact` action `list`, `scope` = `files`,
+  `url` = the page; save that output as `listing.txt` and run `python3 prune_media.py
+  listing.txt`. Add every entry of the JSON map it prints last (`"media/...mp4": null`, video
+  copies from briefs over 21 days old) to the `files` of this publish. Mention a WARNING line
+  in the step 9 summary.
 - Republish the page with the `Artifact` tool, action `publish`:
   `url` = https://claude.ai/artifact/F5KSHeyUzh53AbRktU8ozy, `file_path` = `site/index.html` from this repo, and `files` =
   `{"briefs/index.json": "out/briefs/index.json", "briefs/<id>.json": "out/briefs/<id>.json",
