@@ -105,6 +105,22 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .flag-actions button { font-family: var(--font-mono); font-size: 0.72rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
 .flag-actions button.open { border-color: var(--accent); color: var(--accent); }
 .views button.v-saved { color: var(--saved); border-color: var(--saved); }
+.search-box { display: flex; flex-direction: column; gap: 10px; }
+.search-box input { font: inherit; font-size: 1rem; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; }
+.search-box input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.search-filter button { font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.search-filter button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.search-filter button.f-saved { color: var(--saved); border-color: var(--saved); }
+.search-filter button.f-saved[aria-pressed="true"] { background: var(--saved); border-color: var(--saved); color: var(--surface); }
+.search-hit { display: flex; flex-direction: column; gap: 6px; padding-block: 14px; border-top: 1px solid var(--line); }
+.search-hit.saved { background: var(--saved-soft); border-radius: 10px; border-top: 0; padding-inline: 12px; margin-block: 4px; }
+.search-hit h4 { font-family: var(--font-display); font-size: 1.02rem; line-height: 1.3; margin: 0; }
+.search-hit p { margin: 0; max-width: 65ch; font-size: 0.95rem; }
+.search-hit mark { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 2px; }
+.search-hit.saved mark { background: var(--surface); }
+.search-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+.search-status { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); margin: 0; }
 .views button.v-saved[aria-pressed="true"] { background: var(--saved); border-color: var(--saved); color: var(--surface); }
 .saved-card { background: var(--saved-soft); border-radius: 10px; border-top: 0; padding: 14px; }
 .saved-card + .saved-card { margin-top: 8px; }
@@ -254,6 +270,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     <button type="button" id="view-briefs" aria-pressed="true">Briefs</button>
     <button type="button" id="view-flagged" aria-pressed="false">Flagged <span id="flag-count"></span></button>
     <button type="button" id="view-saved" class="v-saved" aria-pressed="false">Saved articles</button>
+    <button type="button" id="view-search" aria-pressed="false">Search</button>
     <button type="button" id="view-topics" aria-expanded="false" aria-controls="interests">More of this <span id="topic-count"></span></button>
   </nav>
 
@@ -417,6 +434,115 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
     $("#view-briefs").setAttribute("aria-pressed", v === "briefs" ? "true" : "false");
     $("#view-flagged").setAttribute("aria-pressed", v === "flagged" ? "true" : "false");
     $("#view-saved").setAttribute("aria-pressed", v === "saved" ? "true" : "false");
+    $("#view-search").setAttribute("aria-pressed", v === "search" ? "true" : "false");
+  }
+
+  // Search every brief. Briefs load once per visit (a few at a time), then searching is instant.
+  // Filters: everything, saved Apple News articles, newsletter stories (Gmail), online finds, wildcards.
+  let allItems = null, loadingAll = null, searchQ = "", searchF = "all";
+  async function loadAllItems(onProgress) {
+    if (allItems) return allItems;
+    if (!loadingAll) loadingAll = (async () => {
+      const out = [], list = index.slice();
+      let done = 0, i = 0;
+      const worker = async () => {
+        while (i < list.length) {
+          const e = list[i++];
+          try {
+            const b = await getJSON("briefs/" + idOf(e) + ".json");
+            b.items.forEach((it, n) => out.push({ entry: e, brief: b, n, item: it,
+              hay: [it.title, it.text, it.source, ...(it.urls || []).map(u => typeof u === "string" ? "" : u.label)].filter(Boolean).join(" ").toLowerCase() }));
+          } catch (err) {}
+          done++; if (onProgress) onProgress(done, list.length);
+        }
+      };
+      await Promise.all(Array.from({ length: 6 }, worker));
+      out.sort((a, b) => (idOf(b.entry) > idOf(a.entry) ? 1 : idOf(b.entry) < idOf(a.entry) ? -1 : a.n - b.n));
+      allItems = out;
+      return out;
+    })();
+    return loadingAll;
+  }
+  const kindOf = (it) => {
+    if (it.origin === "saved") return "saved";
+    const o = originOf(it);
+    return o && o.cls === "web" ? "web" : "news";
+  };
+  function highlight(node, text, terms) {
+    if (!terms.length) { node.textContent = text; return node; }
+    const re = new RegExp("(" + terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "gi");
+    text.split(re).forEach((part, i) => node.append(i % 2 ? el("mark", null, part) : document.createTextNode(part)));
+    return node;
+  }
+  async function renderSearch() {
+    setView("search");
+    stopSync(); currentAudio = null; currentBrief = null;
+    const main = $("#brief");
+    const wrap = el("div"); wrap.style.display = "flex"; wrap.style.flexDirection = "column"; wrap.style.gap = "10px";
+    const head = el("div", "brief-head");
+    head.append(el("span", "eyebrow", "All briefs"), el("h2", null, "Search"));
+    const box = el("div", "search-box");
+    const input = document.createElement("input");
+    input.type = "search"; input.id = "search-input"; input.placeholder = "Search stories, sources, topics…"; input.value = searchQ;
+    input.setAttribute("aria-label", "Search all briefs"); input.autocomplete = "off";
+    const filters = el("div", "search-filter"); filters.setAttribute("role", "group"); filters.setAttribute("aria-label", "Show");
+    [["all", "All"], ["saved", "Saved articles"], ["news", "Newsletters"], ["web", "Online"], ["wild", "Wildcards"]].forEach(([k, label]) => {
+      const b = el("button", k === "saved" ? "f-saved" : null, label); b.type = "button"; b.id = "sf-" + k; b.dataset.f = k;
+      b.setAttribute("aria-pressed", k === searchF ? "true" : "false");
+      b.addEventListener("click", () => { searchF = k; filters.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); draw(); });
+      filters.append(b);
+    });
+    const status = el("p", "search-status", "Loading your briefs…");
+    const results = el("div");
+    box.append(input, filters);
+    wrap.append(head, box, status, results);
+    main.replaceChildren(wrap);
+    document.querySelectorAll("#log-list a").forEach(a => a.setAttribute("aria-current", "false"));
+    let timer = 0;
+    input.addEventListener("input", () => { searchQ = input.value; clearTimeout(timer); timer = setTimeout(draw, 120); });
+    input.focus({ preventScroll: true });
+    function draw() {
+      if (!allItems || viewing !== "search") return;
+      const terms = searchQ.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+      const hits = allItems.filter(r => {
+        const it = r.item;
+        if (searchF === "wild" ? !(it.wildcard === true || isWild(it.text || "")) : searchF !== "all" && kindOf(it) !== searchF) return false;
+        return terms.every(t => r.hay.includes(t));
+      });
+      const shown = hits.slice(0, 60);
+      status.textContent = (terms.length || searchF !== "all")
+        ? hits.length + (hits.length === 1 ? " story" : " stories") + (hits.length > shown.length ? ", showing the newest " + shown.length : "")
+        : "Type to search " + allItems.length + " stories across " + index.length + " briefs, or pick a filter.";
+      results.replaceChildren();
+      if (!terms.length && searchF === "all") return;
+      shown.forEach((r) => {
+        const it = r.item, k = kindOf(it);
+        const card = el("article", "search-hit" + (k === "saved" ? " saved" : ""));
+        const meta = el("div", "search-meta");
+        meta.append(el("span", null, labelOf(r.entry) + " · item " + String(r.n + 1).padStart(2, "0")));
+        const o = originOf(it); if (o) meta.append(el("span", "origin " + o.cls, o.text));
+        if (it.wildcard === true || isWild(it.text || "")) meta.append(el("span", "tag", "Wildcard"));
+        card.append(meta);
+        if (it.title) card.append(highlight(el("h4"), it.title, terms));
+        card.append(highlight(el("p"), (it.text || "").replace(/^From your saved articles:\s*/i, ""), terms));
+        if (it.source) card.append(highlight(el("span", "src"), it.source, terms));
+        const act = el("div", "flag-actions");
+        if (it.full && it.full.src) {
+          const lb = el("button", "listen", "Listen to the full article"); lb.type = "button";
+          lb.style.cssText = "background:var(--saved);border-color:var(--saved);color:var(--surface)";
+          lb.addEventListener("click", () => renderArticle(r.brief, r.n, it, null, primeAudio()));
+          act.append(lb);
+        }
+        const open = el("button", "open", "Open in brief"); open.type = "button";
+        open.addEventListener("click", () => openItem(idOf(r.entry), r.n + 1));
+        act.append(open);
+        card.append(act);
+        results.append(card);
+      });
+      if ((terms.length || searchF !== "all") && !hits.length) results.append(el("div", "empty", "Nothing matches. Try fewer or different words, or another filter."));
+    }
+    await loadAllItems((d, t) => { if (viewing === "search") status.textContent = "Loading your briefs… " + d + " of " + t; });
+    draw();
   }
 
   // Every saved Apple News article, newest first, across all briefs. saved/used.json lists them
@@ -1415,6 +1541,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
   });
   $("#view-flagged").addEventListener("click", () => { renderFlagged(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   $("#view-saved").addEventListener("click", () => { renderSaved(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  $("#view-search").addEventListener("click", () => { renderSearch(); window.scrollTo({ top: 0, behavior: "smooth" }); });
   $("#view-briefs").addEventListener("click", () => { if (index[0]) show(idOf(index[0]), true); });
 
   async function start() {
