@@ -227,12 +227,12 @@ Write `digest.json` in the format documented at the top of `build_digest.py`:
 - `python3 media.py digest.json` finds one image or video per item (from `media_urls`,
   then the article pages: X posts, YouTube, og:image/og:video, `<video>` tags), saves it
   under `media/`, writes `media` into each item in digest.json, and prints the `files`
-  entries for step 8. Videos up to 14 MB play on the page; YouTube and bigger videos show
-  as a poster that opens the video.
+  entries for step 8. Videos are never copied onto the page: every video shows as a still
+  with a play badge that opens it at its original source (Adam's choice, 2026-11-27).
 - Look at every saved image (Read the .jpg) and keep only ones worth seeing: product shots,
   demo stills, screenshots, charts, diagrams, real photos of the thing. Drop logos, generic
   social cards, stock photos and headshots: set that item's `"media": []` in digest.json and
-  leave its files out of step 8. Keep every playable video unless it is clearly unrelated.
+  leave its files out of step 8. Keep every video still unless it is clearly unrelated.
 - If it fails, carry on without media and say so in the step 9 summary.
 
 ## 7. Audio

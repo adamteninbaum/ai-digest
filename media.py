@@ -8,10 +8,9 @@ files to OUT_DIR as <id>-<n>-<k>.jpg / .mp4, sets item["media"] in digest.json, 
 
 item["media"] entries:
   {"type": "image", "src": "media/x.jpg", "w": 1200, "h": 675}
-  {"type": "video", "src": "media/x.mp4", "poster": "media/x.jpg"}   playable on the page
-  {"type": "link", "url": "https://youtube...", "poster": "media/x.jpg", "label": "Watch on YouTube"}
-The page cannot embed other sites (no YouTube iframes), so YouTube and videos too large to
-host become a poster image that opens the video.
+  {"type": "link", "url": "https://...", "poster": "media/x.jpg", "label": "Watch the video"}
+The page cannot embed other sites, and videos are not copied onto it (storage cap), so every
+video (X, YouTube, og:video, <video> tags) becomes a still image that opens it at the source.
 Sources: X/Twitter posts (via api.fxtwitter.com), YouTube links, and any page's og:image /
 og:video / twitter:image / <video> tags. Generic cards (GitHub, HN, logos, tiny images) are skipped.
 """
@@ -139,8 +138,8 @@ def save_video(src, dest):
 
 
 def media_for(item, prefix, out_dir):
-    """One piece of media per item: a playable video if there is one, else a video poster that
-    opens it, else the best image. Tries each URL in order and stops at the first that works."""
+    """One piece of media per item: a video still that opens the video at its source, else the
+    best image. Tries each URL in order and stops at the first that works."""
     urls = list(item.get("media_urls") or [])
     urls += [u if isinstance(u, str) else u.get("url", "") for u in item.get("urls") or []]
     base = os.path.join(out_dir, prefix)
@@ -156,19 +155,17 @@ def media_for(item, prefix, out_dir):
                 if kind == "image":
                     w, h = save_image(src, base + ".jpg")
                     return [{"type": "image", "src": base + ".jpg", "w": w, "h": h}]
+                # Videos are never copied onto the page (it has a storage cap and cannot embed
+                # other sites): show a still that opens the video at its original source.
                 poster = None
-                if extra.get("poster"):
+                stills = [extra.get("poster")] + [c[1] for c in cands if c[0] == "image"]
+                for still in [x for x in stills if x]:
                     try:
-                        save_image(extra["poster"], base + "-poster.jpg")
+                        save_image(still, base + "-poster.jpg")
                         poster = base + "-poster.jpg"
+                        break
                     except Exception:
                         pass
-                if kind == "video":
-                    try:
-                        save_video(src, base + ".mp4")
-                        return [{"type": "video", "src": base + ".mp4", "poster": poster}]
-                    except Exception as e:
-                        print(f"  video skipped ({e})", file=sys.stderr)
                 if poster:
                     return [{"type": "link", "url": src if kind == "link" else (extra.get("page") or url),
                              "poster": poster, "label": extra.get("label", "Watch the video")}]
