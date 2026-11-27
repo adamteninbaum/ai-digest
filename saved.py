@@ -114,6 +114,13 @@ def parse(text):
         if sep and k.strip().lower() in meta:
             meta[k.strip().lower()] = v.strip()
     paras = [" ".join(p.split()) for p in re.split(r"\n\s*\n", body) if p.strip()]
+    # Sometimes the capture puts the publication in Title and "<Headline> - <Publication>" in
+    # Source (e.g. Title: The Economist / Source: Humanoid robots are coming - The Economist).
+    if " - " in meta["source"]:
+        head, _, pub = meta["source"].rpartition(" - ")
+        simple = lambda t: re.sub(r"[^a-z0-9]", "", t.lower().replace("the ", ""))
+        if head and simple(pub) and simple(pub) == simple(meta["title"]):
+            meta["title"], meta["source"] = head.strip(), pub.strip()
     # The capture repeats the title as the first body paragraph; drop it (the page shows the title).
     if paras and meta["title"] and paras[0].lower() == meta["title"].lower():
         paras = paras[1:]
